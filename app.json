@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Fleg Score",
+    "slug": "fleg-score",
+    "version": "0.1.0",
+    "scheme": "flegscore",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#08080F",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "bundleIdentifier": "in.fleg.score",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "in.fleg.score",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "tsconfigPaths": true,
+      "typedRoutes": true
+    }
+  }
+}
