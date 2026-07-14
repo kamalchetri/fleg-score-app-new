@@ -1,144 +1,220 @@
-import { useCallback, useState } from "react";
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+// App-WP2: tournament hub. Tabs (Entrants · Fixtures · Standings · Schedule
+// · Settings) gated by staff membership — non-staff users see the read-only
+// summary (the same screen they got pre-WP2).
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { supabase } from "@/lib/supabase";
-import { formatDateRange, formatDateTime } from "@/lib/format";
+import { fetchHub, isStaff } from "@/lib/queries";
+import { formatDateRange } from "@/lib/format";
 import { Colors, Spacing } from "@/lib/theme";
 import { Badge, Button, Card, EmptyState, Screen } from "@/components/ui";
+import { HubProvider, useHub, type HubContextValue } from "@/components/tournament/HubContext";
+import { Tabs, type HubTab } from "@/components/tournament/Tabs";
+import { EntrantsTab } from "@/components/tournament/EntrantsTab";
+import { FixturesTab } from "@/components/tournament/FixturesTab";
+import { StandingsTab } from "@/components/tournament/StandingsTab";
+import { ScheduleTab } from "@/components/tournament/ScheduleTab";
+import { SettingsTab } from "@/components/tournament/SettingsTab";
 
-interface Row {
-  id: string;
-  status: string;
-  court: string | null;
-  scheduled_at: string | null;
-  a: { display_name: string } | null;
-  b: { display_name: string } | null;
-  category: { name: string } | null;
-}
+type Gate = "loading" | "denied" | "staff" | "public";
 
-interface T {
-  id: string;
-  name: string;
-  sport: string;
-  status: string;
-  starts_at: string | null;
-  ends_at: string | null;
-  city: string | null;
-  venue_name: string | null;
-}
-
-export default function TournamentSummary() {
+export default function TournamentHub() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [t, setT] = useState<T | null>(null);
-  const [matches, setMatches] = useState<Row[]>([]);
+  const [gate, setGate] = useState<Gate>("loading");
+  const [data, setData] = useState<HubContextValue["data"] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!id) return;
+    const d = await fetchHub(id);
+    if (!d) {
+      setGate("denied");
+      return;
+    }
+    setData(d);
+  }, [id]);
+
+  const loadWithGate = useCallback(async () => {
+    if (!id) return;
+    try {
+      const d = await fetchHub(id);
+      if (!d) {
+        setGate("denied");
+        return;
+      }
+      setData(d);
+      const staff = await isStaff(id);
+      setGate(staff ? "staff" : "public");
+    } catch {
+      setGate("denied");
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadWithGate().catch(() => setGate("denied"));
+  }, [loadWithGate]);
 
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        const { data } = await supabase
-          .from("tournaments")
-          .select("id, name, sport, status, starts_at, ends_at, city, venue_name")
-          .eq("id", id)
-          .maybeSingle();
-        setT(data as T | null);
-        const { data: ms } = await supabase
-          .from("matches")
-          .select(
-            `id, status, court, scheduled_at,
-             a:entrants!matches_entrant_a_fkey(display_name),
-             b:entrants!matches_entrant_b_fkey(display_name),
-             category:tournament_categories!matches_category_id_fkey(name)`,
-          )
-          .eq("tournament_id", id)
-          .order("scheduled_at", { ascending: true, nullsFirst: false })
-          .limit(50);
-        setMatches((ms ?? []) as unknown as Row[]);
-      })();
-    }, [id]),
+      // Re-check staff on focus so a freshly invited co-organizer sees the hub.
+      if (gate === "staff" || gate === "public") loadWithGate().catch(() => {});
+    }, [gate, loadWithGate]),
   );
 
-  if (!t) {
+  async function onRefresh() {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }
+
+  if (gate === "loading" || !data) {
     return (
       <Screen>
         <EmptyState title="Loading…" />
       </Screen>
     );
   }
+  if (gate === "denied") {
+    return (
+      <Screen>
+        <EmptyState title="Tournament not found" body="It may be unpublished or archived." />
+      </Screen>
+    );
+  }
+  if (gate === "public") {
+    return <PublicSummary data={data} onRefresh={onRefresh} refreshing={refreshing} openWeb={() => Linking.openURL(`https://www.fleg.in/dashboard/t/${data.tournament.id}`)} />;
+  }
 
-  const live = matches.filter((m) => m.status === "live");
-  const rest = matches.filter((m) => m.status !== "live");
+  return <StaffHub data={data} refresh={refresh} />;
+}
 
+function PublicSummary({
+  data,
+  refreshing,
+  onRefresh,
+  openWeb,
+}: {
+  data: HubContextValue["data"];
+  refreshing: boolean;
+  onRefresh: () => void;
+  openWeb: () => void;
+}) {
+  const live = data.matches.filter((m) => m.status === "live");
+  const rest = data.matches.filter((m) => m.status !== "live");
+  const nameById = useMemo(() => new Map(data.entrants.map((e) => [e.id, e.display_name])), [data.entrants]);
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
+      <ScrollView
+        contentContainerStyle={{ padding: Spacing.lg }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.green} />}
+      >
         <Card>
           <View style={styles.rowBetween}>
-            <Text style={styles.name}>{t.name}</Text>
-            <Badge status={t.status} />
+            <Text style={styles.name}>{data.tournament.name}</Text>
+            <Badge status={data.tournament.status} />
           </View>
           <Text style={styles.meta}>
-            {t.sport} · {formatDateRange(t.starts_at, t.ends_at)}
-            {t.venue_name ? ` · ${t.venue_name}` : ""}
-            {t.city ? `, ${t.city}` : ""}
+            {data.tournament.sport} · {formatDateRange(data.tournament.starts_at, data.tournament.ends_at)}
+            {data.tournament.venue_name ? ` · ${data.tournament.venue_name}` : ""}
+            {data.tournament.city ? `, ${data.tournament.city}` : ""}
           </Text>
           <Text style={[styles.meta, { marginTop: Spacing.sm }]}>
-            Full management (entrants, brackets, scheduling) is on the web dashboard for now — in-app
-            management arrives in the next build.
+            Management tools (entrants, fixtures, schedule) open once you're added as staff on the web dashboard.
           </Text>
-          <Button
-            label="Open web dashboard"
-            variant="ghost"
-            onPress={() => Linking.openURL(`https://www.fleg.in/dashboard/t/${t.id}`)}
-          />
+          <Button label="Open web dashboard" variant="ghost" onPress={openWeb} />
         </Card>
-
         {live.length > 0 ? <Text style={styles.section}>Live now</Text> : null}
         {live.map((m) => (
-          <MatchRow key={m.id} m={m} />
+          <PublicMatchCard key={m.id} m={m} nameById={nameById} />
         ))}
-
         <Text style={styles.section}>Matches</Text>
         {rest.length === 0 ? (
-          <EmptyState title="No matches yet" body="Generate the bracket on the web dashboard." />
+          <EmptyState title="No matches yet" />
         ) : (
-          rest.map((m) => <MatchRow key={m.id} m={m} />)
+          rest.map((m) => <PublicMatchCard key={m.id} m={m} nameById={nameById} />)
         )}
       </ScrollView>
     </Screen>
   );
 }
 
-function MatchRow({ m }: { m: Row }) {
+function PublicMatchCard({
+  m,
+  nameById,
+}: {
+  m: HubContextValue["data"]["matches"][number];
+  nameById: Map<string, string>;
+}) {
   return (
     <Card>
       <View style={styles.rowBetween}>
         <Text style={styles.teams} numberOfLines={1}>
-          {m.a?.display_name ?? "TBD"} vs {m.b?.display_name ?? "TBD"}
+          {(m.entrant_a ? nameById.get(m.entrant_a) ?? "TBD" : "TBD") +
+            " vs " +
+            (m.entrant_b ? nameById.get(m.entrant_b) ?? "TBD" : "TBD")}
         </Text>
         <Badge status={m.status} />
       </View>
-      <Text style={styles.meta}>
-        {m.category?.name}
-        {m.court ? ` · ${m.court}` : ""} · {formatDateTime(m.scheduled_at)}
-      </Text>
-      <Button
-        label={m.status === "live" ? "Watch live" : "Open"}
-        variant="ghost"
-        onPress={() => router.push(`/live/${m.id}`)}
-      />
     </Card>
   );
 }
 
+function StaffHub({ data, refresh }: { data: HubContextValue["data"]; refresh: () => Promise<void> }) {
+  const [tab, setTab] = useState<HubTab>("entrants");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const ctx = useMemo<HubContextValue>(() => {
+    const entrantNameById = new Map<string, string>();
+    for (const e of data.entrants) entrantNameById.set(e.id, e.display_name);
+    return { tournamentId: data.tournament.id, data, refresh, entrantNameById };
+  }, [data, refresh]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }
+
+  return (
+    <HubProvider value={ctx}>
+      <Screen>
+        <View style={styles.stickyHeader}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {data.tournament.name}
+            </Text>
+            <Badge status={data.tournament.status} />
+          </View>
+          <Tabs active={tab} onChange={setTab} />
+        </View>
+        {tab === "entrants" ? (
+          <EntrantsTab refreshing={refreshing} onRefresh={onRefresh} />
+        ) : tab === "fixtures" ? (
+          <FixturesTab refreshing={refreshing} onRefresh={onRefresh} onTab={setTab} />
+        ) : tab === "standings" ? (
+          <StandingsTab refreshing={refreshing} onRefresh={onRefresh} />
+        ) : tab === "schedule" ? (
+          <ScheduleTab refreshing={refreshing} onRefresh={onRefresh} />
+        ) : (
+          <SettingsTab refreshing={refreshing} onRefresh={onRefresh} />
+        )}
+      </Screen>
+    </HubProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  rowBetween: {
+  stickyHeader: { backgroundColor: Colors.bg },
+  titleRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
     gap: Spacing.sm,
   },
   name: { color: Colors.text, fontSize: 18, fontWeight: "800", flex: 1 },
-  teams: { color: Colors.text, fontSize: 15, fontWeight: "700", flex: 1 },
   meta: { color: Colors.textDim, fontSize: 13, marginTop: Spacing.xs },
   section: {
     color: Colors.text,
@@ -147,4 +223,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     marginBottom: Spacing.md,
   },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  teams: { color: Colors.text, fontSize: 15, fontWeight: "700", flex: 1 },
 });
