@@ -5,9 +5,11 @@ import { EmptyState, Screen } from "@/components/ui";
 import { parseRankedRules, type RankedBoard } from "@/lib/ranked-results/engine";
 import { RANKED_LAB_FIXTURES, type RankedLabFixture } from "@/lib/ranked-results/fixtures";
 import { Colors, Font, Radius, Spacing } from "@/lib/theme";
+import { isReviewBuild } from "@/lib/build-flags";
+import { ReviewBanner } from "@/components/review/ReviewBanner";
 
 export default function RankedResultsLabRoute() {
-  if (!__DEV__) {
+  if (!__DEV__ && !isReviewBuild()) {
     return (
       <Screen>
         <EmptyState title="Not available." />
@@ -28,6 +30,7 @@ function RankedResultsLab() {
 
   return (
     <Screen edges={["left", "right", "bottom"]}>
+      {isReviewBuild() && <ReviewBanner />}
       <View style={styles.tools}>
         <Text style={styles.kicker}>Ranked results lab</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.chips}>

@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "@/lib/auth-context";
 import { ensurePendingOrganizerProfile, fetchOrganizerProfile } from "@/lib/queries";
 import { Colors } from "@/lib/theme";
+import { isReviewBuild } from "@/lib/build-flags";
 
 export default function Index() {
   const { session, loading } = useAuth();
@@ -28,6 +29,8 @@ export default function Index() {
       </View>
     );
   }
+
+  if (isReviewBuild()) return <Redirect href={"/review" as Href} />;
 
   if (!session) {
     return <Redirect href="/login" />;

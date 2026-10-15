@@ -6,11 +6,13 @@ import { SCORING_LAB_FIXTURES, SCORING_LAB_LONG_NAMES, type ScoringLabFixture } 
 import { MatchScoringView } from "@/components/scoring/MatchScoringView";
 import { EmptyState, Screen } from "@/components/ui";
 import { Colors, Font, Radius, Spacing } from "@/lib/theme";
+import { isReviewBuild } from "@/lib/build-flags";
+import { ReviewBanner } from "@/components/review/ReviewBanner";
 
 const STATUSES = ["scheduled", "live", "completed"] as const;
 
 export default function ScoringLabRoute() {
-  if (!__DEV__) {
+  if (!__DEV__ && !isReviewBuild()) {
     return (
       <Screen>
         <EmptyState title="Not available." />
@@ -100,6 +102,7 @@ function ScoringLab() {
 
   return (
     <Screen edges={["left", "right", "bottom"]} style={{ paddingBottom: 24 }}>
+      {isReviewBuild() && <ReviewBanner />}
       <View style={styles.tools}>
         <Text style={styles.kicker}>Scoring lab</Text>
         <ScrollView

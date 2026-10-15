@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { Colors, Font, Spacing } from "@/lib/theme";
 import { Button, Card, Screen } from "@/components/ui";
+import { isReviewBuild } from "@/lib/build-flags";
 
 export default function Settings() {
   const { session } = useAuth();
@@ -35,6 +36,9 @@ export default function Settings() {
             <Button label="Scoring lab" variant="ghost" onPress={() => router.push("/scoring-lab" as Href)} />
             <Button label="Ranked results lab" variant="ghost" onPress={() => router.push("/ranked-results-lab" as Href)} />
           </>
+        ) : null}
+        {isReviewBuild() ? (
+          <Button label="Association review" variant="ghost" onPress={() => router.push("/review" as Href)} />
         ) : null}
         <Button label="Log out" variant="danger" onPress={logout} />
       </View>

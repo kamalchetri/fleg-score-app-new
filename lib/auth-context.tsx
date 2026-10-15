@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { ensurePendingOrganizerProfile } from "@/lib/queries";
+import { isReviewBuild } from "@/lib/build-flags";
 
 interface AuthState {
   session: Session | null;
@@ -14,6 +15,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ session: null, loading: true });
 
   useEffect(() => {
+    if (isReviewBuild()) {
+      setState({ session: null, loading: false });
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       setState({ session: data.session, loading: false });
       if (data.session?.user) {

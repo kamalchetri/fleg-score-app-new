@@ -58,6 +58,8 @@ export default function RootLayout() {
         <Stack.Screen name="match/[id]" options={{ title: "Match Control" }} />
         <Stack.Screen name="scoring-lab" options={{ title: "Scoring lab" }} />
         <Stack.Screen name="ranked-results-lab" options={{ title: "Ranked results lab" }} />
+        <Stack.Screen name="review" options={{ title: "Association review" }} />
+        <Stack.Screen name="rules-review" options={{ title: "Rules in review" }} />
         <Stack.Screen name="live/[id]" options={{ title: "Live" }} />
         <Stack.Screen name="tournament/new" options={{ title: "New tournament" }} />
         <Stack.Screen name="tournament/[id]" options={{ title: "Tournament" }} />
