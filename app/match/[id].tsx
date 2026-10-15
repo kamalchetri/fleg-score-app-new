@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, AppState } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { computeMatchState, type ScoringEvent } from "@/lib/scoring";
-import type { FutsalDetail, PickleballDetail } from "@/lib/scoring";
+import { type ScoringEvent } from "@/lib/scoring";
 import {
+  dispatchScoreWrite,
+  isGuardedScoringEnabled,
+  presentGuardedAppend,
+} from "@/lib/guarded-scoring";
+import {
+  appendScoreEventGuarded,
   confirmResult,
   fetchEvents,
   fetchMatch,
@@ -14,11 +19,12 @@ import {
   updateSnapshot,
   type MatchDetail,
 } from "@/lib/queries";
-import { elapsedSince } from "@/lib/format";
-import { Colors, Spacing } from "@/lib/theme";
-import { Badge, Button, Card, EmptyState, Screen, ScorePad } from "@/components/ui";
+import { projectMatchState } from "@/lib/scoring/project-match";
+import { EmptyState, Screen } from "@/components/ui";
+import { MatchScoringView } from "@/components/scoring/MatchScoringView";
 
 type Gate = "loading" | "denied" | "ok";
+const SCORE_REFRESH_MS = 2500;
 
 export default function MatchControl() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +34,8 @@ export default function MatchControl() {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const optimisticId = useRef(-1);
+  const busyRef = useRef(false);
+  const appActive = useRef(true);
 
   const load = useCallback(async () => {
     const m = await fetchMatch(id);
@@ -49,22 +57,46 @@ export default function MatchControl() {
     load().catch(() => setGate("denied"));
   }, [load]);
 
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  // Keep a second scorer or the web fallback visible on this device. The
+  // append-only event log remains authoritative; polling needs no Realtime DDL.
+  useEffect(() => {
+    const refreshEvents = async () => {
+      if (!id || !appActive.current || busyRef.current || gate !== "ok") return;
+      try {
+        setEvents(await fetchEvents(id));
+      } catch {
+        // Keep the last confirmed state during a transient connection loss.
+      }
+    };
+    const timer = setInterval(refreshEvents, SCORE_REFRESH_MS);
+    const sub = AppState.addEventListener("change", (status) => {
+      appActive.current = status === "active";
+      if (status === "active") refreshEvents();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [gate, id]);
+
   // 1s tick for the futsal period timer.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const state = useMemo(
-    () =>
-      match?.tournament
-        ? computeMatchState(match.tournament.sport, match.tournament.sport_config, events)
-        : null,
-    [match, events],
-  );
+  const state = useMemo(() => {
+    if (!match?.tournament) return null;
+    return projectMatchState(match, events);
+  }, [match, events]);
 
   async function tap(eventType: string, payload: Record<string, unknown>) {
-    if (busy || !match) return;
+    if (busyRef.current || busy || !match) return;
+    busyRef.current = true;
     setBusy(true);
     const prev = events;
     // Optimistic: fake id below any real id ordering (appended last, engine sorts by id —
@@ -77,10 +109,23 @@ export default function MatchControl() {
     };
     setEvents([...prev, fake]);
     try {
-      await insertEvent(match.id, eventType, payload);
+      const outcome = await dispatchScoreWrite({
+        guarded: isGuardedScoringEnabled(),
+        matchId: match.id,
+        eventType,
+        payload,
+        confirmedEvents: prev,
+        directInsert: insertEvent,
+        guardedAppend: appendScoreEventGuarded,
+      });
+      if (outcome.path === "guarded") {
+        await finishGuardedAppend(match, prev, outcome.result);
+        return;
+      }
       const fresh = await fetchEvents(match.id);
       setEvents(fresh);
-      const s = computeMatchState(match.tournament!.sport, match.tournament!.sport_config, fresh);
+      const s = projectMatchState(match, fresh);
+      if (!s) throw new Error("Tournament scoring configuration is unavailable.");
       await updateSnapshot(match.id, {
         summary: s.scoreSummary,
         display: s.display,
@@ -90,7 +135,42 @@ export default function MatchControl() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Alert.alert("Not recorded", e instanceof Error ? e.message : "Try again.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
+    }
+  }
+
+  async function finishGuardedAppend(
+    current: MatchDetail,
+    confirmed: ScoringEvent[],
+    result: Awaited<ReturnType<typeof appendScoreEventGuarded>>,
+  ) {
+    const presentation = presentGuardedAppend(result);
+    if (presentation.rollbackToConfirmed) setEvents(confirmed);
+    if (presentation.refetch) {
+      try {
+        const fresh = await fetchEvents(current.id);
+        setEvents(fresh);
+        if (result.status === "appended") {
+          const s = projectMatchState(current, fresh);
+          if (s) {
+            try {
+              await updateSnapshot(current.id, {
+                summary: s.scoreSummary,
+                display: s.display,
+              });
+            } catch {
+              // The append is already confirmed. The snapshot is only a cache.
+            }
+          }
+        }
+      } catch {
+        if (result.status === "appended") setEvents(confirmed);
+      }
+    }
+    if (presentation.alertTitle) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Alert.alert(presentation.alertTitle, presentation.alertBody ?? undefined);
     }
   }
 
@@ -145,7 +225,7 @@ export default function MatchControl() {
       </Screen>
     );
   }
-  if (gate === "denied" || !match || !state) {
+  if (gate === "denied" || !match) {
     return (
       <Screen>
         <EmptyState
@@ -156,186 +236,9 @@ export default function MatchControl() {
     );
   }
 
-  const aName = match.a?.display_name ?? "TBD";
-  const bName = match.b?.display_name ?? "TBD";
-  const sport = match.tournament!.sport;
-
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ padding: Spacing.lg }}>
-        <Card>
-          <View style={styles.headerRow}>
-            <Text style={styles.meta}>
-              {match.tournament!.name} · {match.category?.name}
-            </Text>
-            <Badge status={match.status} />
-          </View>
-          <View style={styles.scoreRow}>
-            <Text style={styles.team} numberOfLines={2}>
-              {aName}
-            </Text>
-            <Text style={styles.score}>
-              {state.scoreSummary.a} – {state.scoreSummary.b}
-            </Text>
-            <Text style={[styles.team, { textAlign: "right" }]} numberOfLines={2}>
-              {bName}
-            </Text>
-          </View>
-          <Text style={styles.display}>{state.display}</Text>
-          {sport === "futsal" ? <FutsalSubline detail={state.detail as FutsalDetail} now={now} /> : null}
-          {sport === "pickleball" ? (
-            <PickleballSubline detail={state.detail as PickleballDetail} />
-          ) : null}
-        </Card>
-
-        {match.status === "scheduled" ? (
-          <Button label="Start match" onPress={onStart} loading={busy} />
-        ) : null}
-
-        {match.status === "live" ? (
-          <>
-            {sport === "futsal" ? (
-              <FutsalControls
-                detail={state.detail as FutsalDetail}
-                busy={busy}
-                aName={aName}
-                bName={bName}
-                tap={tap}
-              />
-            ) : (
-              <View style={styles.padRow}>
-                <ScorePad label={`POINT`} sublabel={aName} disabled={busy} onPress={() => tap("point", { side: "a" })} />
-                <ScorePad label={`POINT`} sublabel={bName} disabled={busy} onPress={() => tap("point", { side: "b" })} />
-              </View>
-            )}
-
-            <Button
-              label="UNDO last"
-              variant="ghost"
-              disabled={busy || events.length === 0}
-              onPress={() => tap("undo", {})}
-            />
-
-            {state.isComplete && state.winnerSide ? (
-              <Button label="Confirm result" onPress={onConfirmResult} loading={busy} />
-            ) : null}
-          </>
-        ) : null}
-
-        {match.status === "completed" ? (
-          <EmptyState title="Match completed" body={`Final: ${state.display}`} />
-        ) : null}
-      </ScrollView>
+    <Screen edges={["left", "right", "bottom"]} style={{ paddingBottom: 24 }}>
+      <MatchScoringView match={match} events={events} busy={busy} now={now} onEvent={tap} onStart={onStart} onConfirm={onConfirmResult} />
     </Screen>
   );
 }
-
-function FutsalSubline({ detail, now }: { detail: FutsalDetail; now: number }) {
-  let line: string;
-  if (detail.inShootout) line = "Penalty shootout";
-  else if (detail.currentPeriod && detail.periodStartedAt)
-    line = `Period ${detail.currentPeriod} · ${elapsedSince(detail.periodStartedAt, now)}`;
-  else if (detail.periodsCompleted === 0) line = "Not started";
-  else line = `${detail.periodsCompleted}/${detail.regulationPeriods} periods played`;
-  return <Text style={styles.subline}>{line}</Text>;
-}
-
-function PickleballSubline({ detail }: { detail: PickleballDetail }) {
-  return (
-    <Text style={styles.subline}>
-      Game {detail.completedGames.length + 1} · {detail.currentGame.a}–{detail.currentGame.b} · to{" "}
-      {detail.pointsTo} (win by {detail.winBy})
-    </Text>
-  );
-}
-
-function FutsalControls({
-  detail,
-  busy,
-  aName,
-  bName,
-  tap,
-}: {
-  detail: FutsalDetail;
-  busy: boolean;
-  aName: string;
-  bName: string;
-  tap: (t: string, p: Record<string, unknown>) => void;
-}) {
-  const periodLive = detail.currentPeriod !== null;
-  const scoringOpen = periodLive || detail.inShootout;
-  return (
-    <>
-      <View style={styles.padRow}>
-        <ScorePad
-          label="GOAL"
-          sublabel={aName}
-          disabled={busy || !scoringOpen}
-          onPress={() => tap("goal", { side: "a" })}
-        />
-        <ScorePad
-          label="GOAL"
-          sublabel={bName}
-          disabled={busy || !scoringOpen}
-          onPress={() => tap("goal", { side: "b" })}
-        />
-      </View>
-      <View style={styles.cardRow}>
-        {(["a", "b"] as const).map((side) => (
-          <View key={side} style={styles.cardCol}>
-            <Button
-              label={`Yellow · ${side === "a" ? aName : bName}`}
-              variant="ghost"
-              disabled={busy || !periodLive}
-              onPress={() => tap("card", { side, cardType: "yellow", player: null })}
-            />
-            <Button
-              label={`Red · ${side === "a" ? aName : bName}`}
-              variant="danger"
-              disabled={busy || !periodLive}
-              onPress={() => tap("card", { side, cardType: "red", player: null })}
-            />
-          </View>
-        ))}
-      </View>
-      {periodLive ? (
-        <Button label={`End period ${detail.currentPeriod}`} variant="ghost" disabled={busy} onPress={() => tap("period_end", {})} />
-      ) : (
-        <Button
-          label={
-            detail.periodsCompleted >= detail.regulationPeriods
-              ? "Start shootout period"
-              : `Start period ${detail.periodsCompleted + 1}`
-          }
-          disabled={busy}
-          onPress={() => tap("period_start", {})}
-        />
-      )}
-    </>
-  );
-}
-
-const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  meta: { color: Colors.textDim, fontSize: 13, flex: 1 },
-  scoreRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  team: { color: Colors.text, fontSize: 16, fontWeight: "700", flex: 1 },
-  score: {
-    color: Colors.green,
-    fontSize: 44,
-    fontWeight: "900",
-    fontVariant: ["tabular-nums"],
-    marginHorizontal: Spacing.md,
-  },
-  display: { color: Colors.textDim, textAlign: "center", marginTop: Spacing.sm },
-  subline: { color: Colors.textDim, textAlign: "center", marginTop: Spacing.xs, fontSize: 13 },
-  padRow: { flexDirection: "row", marginVertical: Spacing.md },
-  cardRow: { flexDirection: "row", gap: Spacing.md },
-  cardCol: { flex: 1 },
-});

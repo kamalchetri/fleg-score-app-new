@@ -1,0 +1,4 @@
+BEGIN;
+LOCK TABLE public.tournaments IN ACCESS EXCLUSIVE MODE;
+SELECT pg_sleep(8);
+COMMIT;

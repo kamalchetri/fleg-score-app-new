@@ -4,7 +4,7 @@
 import { useCallback, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ALLOWED_TRANSITIONS, updateTournamentStatus } from "@/lib/queries";
-import { Colors, Radius, Spacing, statusColors, statusLabel } from "@/lib/theme";
+import { Colors, Font, Radius, Spacing, statusColors, statusLabel } from "@/lib/theme";
 import { Card, EmptyState } from "@/components/ui";
 import { useHub } from "./HubContext";
 
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     marginBottom: Spacing.md,
   },
-  chipText: { fontSize: 14, fontWeight: "700", textTransform: "capitalize" },
+  chipText: { fontSize: 14, fontFamily: Font.bold, textTransform: "capitalize" },
   hint: { color: Colors.textDim, fontSize: 14, lineHeight: 20 },
   transitionBtn: {
     paddingHorizontal: Spacing.md,
@@ -113,6 +113,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     backgroundColor: Colors.elevated,
   },
-  transitionText: { color: Colors.green, fontWeight: "800", fontSize: 15 },
+  transitionText: { color: Colors.green, fontFamily: Font.extrabold, fontSize: 15 },
   about: { color: Colors.textDim, fontSize: 13, lineHeight: 20 },
 });

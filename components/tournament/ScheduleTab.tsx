@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Colors, Radius, Spacing } from "@/lib/theme";
+import { Colors, Font, Radius, Spacing } from "@/lib/theme";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { setMatchSchedule, setWalkoverAction } from "./schedule-actions";
 import type { HubMatch } from "@/lib/queries";
@@ -247,7 +247,7 @@ function ScheduleCard({
 
 const styles = StyleSheet.create({
   section: { marginBottom: Spacing.lg },
-  sectionTitle: { color: Colors.text, fontSize: 16, fontWeight: "800", marginBottom: Spacing.sm },
+  sectionTitle: { color: Colors.text, fontSize: 16, fontFamily: Font.extrabold, marginBottom: Spacing.sm },
   cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -256,11 +256,11 @@ const styles = StyleSheet.create({
   round: {
     color: Colors.textDim,
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: Font.bold,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  teams: { color: Colors.text, fontSize: 15, fontWeight: "700", marginTop: Spacing.xs },
+  teams: { color: Colors.text, fontSize: 15, fontFamily: Font.bold, marginTop: Spacing.xs },
   meta: { color: Colors.textDim, fontSize: 12, marginTop: Spacing.xs },
   editor: { marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
   label: { color: Colors.textDim, fontSize: 13, marginTop: Spacing.sm, marginBottom: 4 },
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   staffChipActive: { borderColor: Colors.green, backgroundColor: Colors.greenDim },
-  staffChipText: { color: Colors.textDim, fontSize: 12, fontWeight: "600" },
+  staffChipText: { color: Colors.textDim, fontSize: 12, fontFamily: Font.semibold },
   staffChipTextActive: { color: Colors.green },
   actions: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.md },
   saveBtn: {
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: "center",
   },
-  saveText: { color: "#04140A", fontWeight: "800" },
+  saveText: { color: "#04140A", fontFamily: Font.extrabold },
   walkoverBlock: { marginTop: Spacing.md },
   walkBtn: {
     flex: 1,
@@ -305,5 +305,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
   },
-  walkText: { fontWeight: "700" },
+  walkText: { fontFamily: Font.bold },
 });

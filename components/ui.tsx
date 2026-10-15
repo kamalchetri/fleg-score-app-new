@@ -11,10 +11,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { Colors, Radius, Spacing, statusColors, statusLabel } from "@/lib/theme";
+import { Colors, Font, Radius, Spacing, statusColors, statusLabel } from "@/lib/theme";
 
-export function Screen({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <SafeAreaView style={[styles.screen, style]}>{children}</SafeAreaView>;
+export function Screen({
+  children,
+  style,
+  edges,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  edges?: ("top" | "right" | "bottom" | "left")[];
+}) {
+  return (
+    <SafeAreaView edges={edges} style={[styles.screen, style]}>
+      {children}
+    </SafeAreaView>
+  );
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
@@ -24,7 +36,7 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
 export function Badge({ status }: { status: string }) {
   const color = statusColors[status] ?? Colors.textDim;
   return (
-    <View style={[styles.badge, { borderColor: color }]}>
+    <View style={[styles.badge, { backgroundColor: `${color}1F`, borderColor: `${color}55` }]}>
       <Text style={[styles.badgeText, { color }]}>{statusLabel(status)}</Text>
     </View>
   );
@@ -69,7 +81,9 @@ export function Button({ label, onPress, variant = "primary", disabled, loading 
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
+        <Text style={[styles.buttonText, { color: fg }]} numberOfLines={3}>
+          {label}
+        </Text>
       )}
     </Pressable>
   );
@@ -81,10 +95,12 @@ interface ScorePadProps {
   onPress: () => void;
   disabled?: boolean;
   color?: string;
+  /** Compact pads stay at least 64dp and are meant to stack in a narrow column. */
+  size?: "large" | "compact";
 }
 
 /** Giant tap target for referees — the whole point of this app. */
-export function ScorePad({ label, sublabel, onPress, disabled, color }: ScorePadProps) {
+export function ScorePad({ label, sublabel, onPress, disabled, color, size = "large" }: ScorePadProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -95,13 +111,25 @@ export function ScorePad({ label, sublabel, onPress, disabled, color }: ScorePad
       }}
       style={({ pressed }) => [
         styles.pad,
+        size === "compact" && styles.padCompact,
         { borderColor: color ?? Colors.green },
         pressed && { backgroundColor: color ? `${color}22` : Colors.greenDim },
         disabled && { opacity: 0.4 },
       ]}
     >
-      <Text style={styles.padLabel}>{label}</Text>
-      {sublabel ? <Text style={styles.padSub}>{sublabel}</Text> : null}
+      <Text
+        style={[styles.padLabel, size === "compact" && styles.padLabelCompact]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+      >
+        {label}
+      </Text>
+      {sublabel ? (
+        <Text style={styles.padSub} numberOfLines={3}>
+          {sublabel}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -119,34 +147,49 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
     borderWidth: 1,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  badgeText: { fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
+  badgeText: { fontSize: 11, fontFamily: Font.bold, letterSpacing: 0.6, textTransform: "uppercase" },
   empty: { alignItems: "center", padding: Spacing.xxl },
-  emptyTitle: { color: Colors.textDim, fontSize: 16, fontWeight: "600" },
-  emptyBody: { color: Colors.textFaint, fontSize: 14, marginTop: Spacing.sm, textAlign: "center" },
+  emptyTitle: { color: Colors.textDim, fontSize: 16, fontFamily: Font.semibold },
+  emptyBody: { color: Colors.textFaint, fontSize: 14, marginTop: Spacing.sm, textAlign: "center", fontFamily: Font.regular },
   button: {
     minHeight: 52,
-    borderRadius: Radius.md,
+    borderRadius: Radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
     marginVertical: Spacing.xs,
   },
-  buttonGhost: { borderWidth: 1, borderColor: Colors.border },
-  buttonText: { fontSize: 16, fontWeight: "700" },
+  buttonGhost: { borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface2 },
+  buttonText: { fontSize: 15, fontFamily: Font.bold, textAlign: "center" },
   pad: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: "46%",
     minHeight: 140,
+    minWidth: 120,
     borderWidth: 2,
     borderRadius: Radius.xl,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.surface,
     marginHorizontal: Spacing.xs,
+    marginVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
   },
-  padLabel: { color: Colors.text, fontSize: 28, fontWeight: "800" },
-  padSub: { color: Colors.textDim, fontSize: 14, marginTop: Spacing.xs },
+  padCompact: {
+    minHeight: 64,
+    minWidth: 0,
+    width: "100%",
+    flexBasis: "auto",
+    flexGrow: 0,
+    marginHorizontal: 0,
+  },
+  padLabel: { color: Colors.text, fontSize: 28, fontFamily: Font.extrabold, textAlign: "center" },
+  padLabelCompact: { fontSize: 22 },
+  padSub: { color: Colors.textDim, fontSize: 14, marginTop: Spacing.xs, fontFamily: Font.medium, textAlign: "center" },
 });

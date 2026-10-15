@@ -16,6 +16,7 @@ import {
   advanceFromGroups,
   knockoutSeedsFromGroups,
 } from "../lib/formats/groups";
+import { resolveMatchFormat, resolveStageContext } from "../lib/scoring/format";
 
 let passed = 0;
 let failed = 0;
@@ -340,6 +341,48 @@ test("knockoutSeedsFromGroups orders rank blocks in group order", () => {
     { group: 0, rank: 2, entrantId: "A2" },
   ]);
   expectEq(seeds.map((s) => s.id), ["A1", "B1", "A2", "B2"]);
+});
+
+// ── Match format context ────────────────────────────────────────────────────
+console.log("\nMatch format context:");
+
+test("stage context uses configured knockout rounds", () => {
+  expectEq(
+    resolveStageContext({
+      stageType: "knockout",
+      stageConfig: { rounds: 4 },
+      matchRound: 3,
+    }),
+    { stageType: "knockout", round: 3, maxRound: 4 },
+  );
+});
+
+test("unknown stage safely matches the web knockout default", () => {
+  expectEq(resolveStageContext({ stageType: "unexpected", matchRound: 2 }), {
+    stageType: "knockout",
+    round: 2,
+    maxRound: 2,
+  });
+});
+
+test("round override preserves darts legs_to_win", () => {
+  expectEq(
+    resolveMatchFormat({
+      sport: "darts",
+      sportConfig: {
+        best_of: 3,
+        points_to: 1,
+        win_by: 1,
+        round_formats: {
+          final: { best_of: 5, points_to: 1, win_by: 1, legs_to_win: 5 },
+        },
+      },
+      stageType: "knockout",
+      round: 3,
+      maxRound: 3,
+    }),
+    { best_of: 5, points_to: 1, win_by: 1, legs_to_win: 5 },
+  );
 });
 
 // ── Summary ─────────────────────────────────────────────────────────────────

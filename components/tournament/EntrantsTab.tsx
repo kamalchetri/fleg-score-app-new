@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useHub } from "./HubContext";
 import { setEntrantStatus } from "@/lib/queries";
-import { Colors, Spacing, statusColors } from "@/lib/theme";
+import { Colors, Font, Spacing, statusColors } from "@/lib/theme";
 import { Badge, Card, EmptyState } from "@/components/ui";
 
 const ENTRANT_STATUSES: Array<{
@@ -203,18 +203,18 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: Spacing.sm,
   },
-  categoryName: { color: Colors.text, fontSize: 17, fontWeight: "800" },
+  categoryName: { color: Colors.text, fontSize: 17, fontFamily: Font.extrabold },
   counts: { color: Colors.textDim, fontSize: 12 },
   row: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
-  name: { color: Colors.text, fontSize: 16, fontWeight: "700" },
-  seed: { color: Colors.textDim, fontSize: 14, fontWeight: "500" },
+  name: { color: Colors.text, fontSize: 16, fontFamily: Font.bold },
+  seed: { color: Colors.textDim, fontSize: 14, fontFamily: Font.medium },
   chip: {
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
   },
-  chipText: { fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
+  chipText: { fontSize: 12, fontFamily: Font.semibold, textTransform: "capitalize" },
   reveal: { color: Colors.textDim, fontSize: 13, marginTop: Spacing.sm },
   contactBlock: { marginTop: Spacing.sm, gap: 2 },
   contactLine: { color: Colors.text, fontSize: 14 },
@@ -230,5 +230,5 @@ const styles = StyleSheet.create({
   actionPrimary: { backgroundColor: Colors.green },
   actionDanger: { backgroundColor: Colors.red },
   actionGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: Colors.border },
-  actionText: { fontSize: 14, fontWeight: "700" },
+  actionText: { fontSize: 14, fontFamily: Font.bold },
 });

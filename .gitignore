@@ -4,6 +4,7 @@ dist/
 *.log
 .env
 .env.local
+.nspg-dry-run/
 ios/
 android/
 *.tsbuildinfo

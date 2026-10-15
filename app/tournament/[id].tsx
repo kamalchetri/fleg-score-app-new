@@ -4,9 +4,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { isOrganizerRole } from "@/lib/audit";
+import { useAuth } from "@/lib/auth-context";
 import { fetchHub, isStaff } from "@/lib/queries";
 import { formatDateRange } from "@/lib/format";
-import { Colors, Spacing } from "@/lib/theme";
+import { Colors, Font, Spacing } from "@/lib/theme";
 import { Badge, Button, Card, EmptyState, Screen } from "@/components/ui";
 import { HubProvider, useHub, type HubContextValue } from "@/components/tournament/HubContext";
 import { Tabs, type HubTab } from "@/components/tournament/Tabs";
@@ -15,6 +17,8 @@ import { FixturesTab } from "@/components/tournament/FixturesTab";
 import { StandingsTab } from "@/components/tournament/StandingsTab";
 import { ScheduleTab } from "@/components/tournament/ScheduleTab";
 import { SettingsTab } from "@/components/tournament/SettingsTab";
+import { AuditLogTab } from "@/components/tournament/AuditLogTab";
+import { ExportTab } from "@/components/tournament/ExportTab";
 
 type Gate = "loading" | "denied" | "staff" | "public";
 
@@ -160,8 +164,11 @@ function PublicMatchCard({
 }
 
 function StaffHub({ data, refresh }: { data: HubContextValue["data"]; refresh: () => Promise<void> }) {
+  const { session } = useAuth();
   const [tab, setTab] = useState<HubTab>("entrants");
   const [refreshing, setRefreshing] = useState(false);
+  const role = data.staff.find((member) => member.user_id === session?.user.id)?.staff_role ?? null;
+  const governance = isOrganizerRole(role);
 
   const ctx = useMemo<HubContextValue>(() => {
     const entrantNameById = new Map<string, string>();
@@ -185,7 +192,7 @@ function StaffHub({ data, refresh }: { data: HubContextValue["data"]; refresh: (
             </Text>
             <Badge status={data.tournament.status} />
           </View>
-          <Tabs active={tab} onChange={setTab} />
+          <Tabs active={tab} onChange={setTab} governance={governance} />
         </View>
         {tab === "entrants" ? (
           <EntrantsTab refreshing={refreshing} onRefresh={onRefresh} />
@@ -195,6 +202,10 @@ function StaffHub({ data, refresh }: { data: HubContextValue["data"]; refresh: (
           <StandingsTab refreshing={refreshing} onRefresh={onRefresh} />
         ) : tab === "schedule" ? (
           <ScheduleTab refreshing={refreshing} onRefresh={onRefresh} />
+        ) : tab === "audit" && governance ? (
+          <AuditLogTab refreshing={refreshing} onRefresh={onRefresh} />
+        ) : tab === "export" && governance ? (
+          <ExportTab role={role} refreshing={refreshing} onRefresh={onRefresh} />
         ) : (
           <SettingsTab refreshing={refreshing} onRefresh={onRefresh} />
         )}
@@ -214,12 +225,12 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     gap: Spacing.sm,
   },
-  name: { color: Colors.text, fontSize: 18, fontWeight: "800", flex: 1 },
+  name: { color: Colors.text, fontSize: 18, fontFamily: Font.extrabold, flex: 1 },
   meta: { color: Colors.textDim, fontSize: 13, marginTop: Spacing.xs },
   section: {
     color: Colors.text,
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: Font.extrabold,
     marginTop: Spacing.lg,
     marginBottom: Spacing.md,
   },
@@ -229,5 +240,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.sm,
   },
-  teams: { color: Colors.text, fontSize: 15, fontWeight: "700", flex: 1 },
+  teams: { color: Colors.text, fontSize: 15, fontFamily: Font.bold, flex: 1 },
 });

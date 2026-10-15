@@ -19,7 +19,7 @@ import { router } from "expo-router";
 import { roundLabel } from "@/lib/bracket/knockout";
 import { generateBracket, generateKnockoutFromStandings, type FixtureConfig } from "@/lib/queries";
 import type { HubCategory, HubMatch, HubStage } from "@/lib/queries";
-import { Colors, Radius, Spacing, statusColors } from "@/lib/theme";
+import { Colors, Font, Radius, Spacing, statusColors } from "@/lib/theme";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { MatchRowCard } from "./MatchRowCard";
 import { useHub } from "./HubContext";
@@ -221,14 +221,14 @@ function GenerateButton({
             onPress={() => setOpen(false)}
             disabled={busy}
           >
-            <Text style={{ color: Colors.text, fontWeight: "700" }}>Cancel</Text>
+            <Text style={{ color: Colors.text, fontFamily: Font.bold }}>Cancel</Text>
           </Pressable>
           <Pressable
             style={[styles.configBtn, { backgroundColor: Colors.green, opacity: busy ? 0.5 : 1 }]}
             onPress={onGenerate}
             disabled={busy}
           >
-            <Text style={{ color: "#04140A", fontWeight: "800" }}>
+            <Text style={{ color: "#04140A", fontFamily: Font.extrabold }}>
               {busy ? "Generating…" : "Generate"}
             </Text>
           </Pressable>
@@ -372,7 +372,7 @@ function GroupsKnockoutSection({
             <Text
               style={{
                 color: allGroupMatchesDone ? "#04140A" : Colors.textFaint,
-                fontWeight: "800",
+                fontFamily: Font.extrabold,
               }}
             >
               {busy ? "Building…" : knockoutStage ? "Rebuild knockout" : "Build knockout from standings"}
@@ -464,18 +464,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     gap: Spacing.md,
   },
-  categoryName: { color: Colors.text, fontSize: 18, fontWeight: "800" },
+  categoryName: { color: Colors.text, fontSize: 18, fontFamily: Font.extrabold },
   meta: { color: Colors.textDim, fontSize: 13, marginTop: Spacing.xs },
   subHeader: {
     color: Colors.text,
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: Font.bold,
     marginBottom: Spacing.sm,
     marginTop: Spacing.xs,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  configTitle: { color: Colors.text, fontSize: 16, fontWeight: "800", marginBottom: Spacing.sm },
+  configTitle: { color: Colors.text, fontSize: 16, fontFamily: Font.extrabold, marginBottom: Spacing.sm },
   configLabel: { color: Colors.textDim, fontSize: 14 },
   configHint: { color: Colors.textFaint, fontSize: 12, marginTop: Spacing.sm },
   configActions: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.md },
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   linkBtn: { paddingVertical: Spacing.sm, marginBottom: Spacing.sm },
-  linkText: { color: Colors.green, fontSize: 14, fontWeight: "700" },
+  linkText: { color: Colors.green, fontSize: 14, fontFamily: Font.bold },
   koDivider: {
     marginTop: Spacing.md,
     paddingTop: Spacing.md,

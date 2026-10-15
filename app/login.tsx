@@ -8,10 +8,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import { Colors, Radius, Spacing } from "@/lib/theme";
+import { routeAfterAuth } from "@/lib/google-auth";
+import { Colors, Font, Radius, Spacing } from "@/lib/theme";
 import { Button, Screen } from "@/components/ui";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -35,7 +37,12 @@ export default function Login() {
       );
       return;
     }
-    router.replace("/home");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace("/home");
+      return;
+    }
+    await routeAfterAuth();
   }
 
   return (
@@ -48,6 +55,8 @@ export default function Login() {
           FLEG <Text style={{ color: Colors.green }}>SCORE</Text>
         </Text>
         <Text style={styles.tagline}>Tournament management & live scoring</Text>
+
+        <GoogleSignInButton />
 
         <TextInput
           style={styles.input}
@@ -73,12 +82,12 @@ export default function Login() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            No account yet? Sign up on the website —{" "}
+            No account yet?{" "}
             <Text
               style={{ color: Colors.green }}
-              onPress={() => Linking.openURL("https://www.fleg.in/signup")}
+              onPress={() => router.push("/signup" as unknown as Href)}
             >
-              fleg.in/signup
+              Create one
             </Text>
           </Text>
           <Text
@@ -95,7 +104,7 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, justifyContent: "center", padding: Spacing.xl },
-  logo: { color: Colors.text, fontSize: 34, fontWeight: "900", textAlign: "center" },
+  logo: { color: Colors.text, fontSize: 34, fontFamily: Font.extrabold, textAlign: "center" },
   tagline: {
     color: Colors.textDim,
     textAlign: "center",

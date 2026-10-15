@@ -7,7 +7,12 @@
 
 import { computeMatchState } from "../lib/scoring";
 import type { ScoringEvent } from "../lib/scoring";
-import type { FutsalDetail, PickleballDetail } from "../lib/scoring";
+import type {
+  FutsalDetail,
+  PickleballDetail,
+  BasketballDetail,
+  BadmintonDetail,
+} from "../lib/scoring";
 
 // ─── Test runner (synchronous, deterministic) ────────────────────────────────
 let passed = 0;
@@ -53,6 +58,10 @@ const futsal = (events: ScoringEvent[]) =>
   computeMatchState("futsal", null, events);
 const pickle = (events: ScoringEvent[]) =>
   computeMatchState("pickleball", null, events);
+const basketball = (events: ScoringEvent[]) =>
+  computeMatchState("basketball", null, events);
+const badminton = (events: ScoringEvent[]) =>
+  computeMatchState("badminton", null, events);
 
 // ─── Futsal ──────────────────────────────────────────────────────────────────
 console.log("\nFutsal:");
@@ -97,7 +106,7 @@ test("full regulation with winner → complete", () => {
 });
 
 resetIds();
-test("regulation draw → incomplete (needs shootout)", () => {
+test("regulation draw → complete as draw (shootout optional)", () => {
   const s = futsal([
     ev("period_start"),
     ev("goal", { side: "a" }),
@@ -106,7 +115,7 @@ test("regulation draw → incomplete (needs shootout)", () => {
     ev("goal", { side: "b" }),
     ev("period_end"),
   ]);
-  expectEq(s.isComplete, false);
+  expectEq(s.isComplete, true);
   expectEq(s.winnerSide, null);
 });
 
@@ -141,8 +150,22 @@ test("cards are tracked with side/type/player", () => {
   ]);
   const d = s.detail as FutsalDetail;
   expectEq(d.cards.length, 2);
-  expectEq(d.cards[0], { side: "a", cardType: "yellow", player: "R. Singh" });
-  expectEq(d.cards[1], { side: "b", cardType: "red", player: null });
+  expectEq(d.cards[0], {
+    side: "a",
+    cardType: "yellow",
+    player: "R. Singh",
+    minute: null,
+    clock: null,
+    secondYellow: false,
+  });
+  expectEq(d.cards[1], {
+    side: "b",
+    cardType: "red",
+    player: null,
+    minute: null,
+    clock: null,
+    secondYellow: false,
+  });
 });
 
 resetIds();
@@ -190,6 +213,50 @@ test("event ids out of insertion order still replay by id", () => {
   const e3 = ev("undo");
   const s = futsal([e3, e1, e2]); // shuffled input
   expectEq(s.scoreSummary, { a: 0, b: 0 });
+});
+
+resetIds();
+function evAt(
+  event_type: string,
+  created_at: string,
+  payload: Record<string, unknown> = {},
+): ScoringEvent {
+  const id = nextId++;
+  return { id, event_type, payload, created_at };
+}
+
+test("possession clock: A 60s then B 40s → 60/40", () => {
+  const s = futsal([
+    evAt("period_start", "2026-08-04T10:00:00.000Z"),
+    evAt("possession", "2026-08-04T10:00:00.000Z", { side: "a" }),
+    evAt("possession", "2026-08-04T10:01:00.000Z", { side: "b" }),
+    evAt("period_end", "2026-08-04T10:01:40.000Z"),
+  ]);
+  const d = s.detail as FutsalDetail;
+  expectEq(d.possessionMs, { a: 60_000, b: 40_000 });
+  expectEq(d.possession, { a: 60, b: 40 });
+});
+
+resetIds();
+test("possession clock: period_end mid-hold closes the segment", () => {
+  const s = futsal([
+    evAt("period_start", "2026-08-04T10:00:00.000Z"),
+    evAt("possession", "2026-08-04T10:00:00.000Z", { side: "a" }),
+    evAt("period_end", "2026-08-04T10:02:30.000Z"),
+  ]);
+  expectEq((s.detail as FutsalDetail).possessionMs, { a: 150_000, b: 0 });
+});
+
+resetIds();
+test("possession clock: undo of switch reverts", () => {
+  const s = futsal([
+    evAt("period_start", "2026-08-04T10:00:00.000Z"),
+    evAt("possession", "2026-08-04T10:00:00.000Z", { side: "a" }),
+    evAt("possession", "2026-08-04T10:01:00.000Z", { side: "b" }),
+    evAt("undo", "2026-08-04T10:01:05.000Z"),
+    evAt("period_end", "2026-08-04T10:02:00.000Z"),
+  ]);
+  expectEq((s.detail as FutsalDetail).possessionMs, { a: 120_000, b: 0 });
 });
 
 // ─── Pickleball ──────────────────────────────────────────────────────────────
@@ -314,6 +381,190 @@ test("custom sport_config overrides preset (points_to 15, best_of 5)", () => {
   const d = s.detail as PickleballDetail;
   expectEq(d.gamesWon, { a: 1, b: 0 });
   expectEq(d.gamesNeeded, 3);
+});
+
+// ─── Basketball ──────────────────────────────────────────────────────────────
+console.log("\nBasketball:");
+
+resetIds();
+test("1/2/3-point events sum correctly", () => {
+  const s = basketball([
+    ev("period_start"),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "b", points: 3 }),
+    ev("point", { side: "a", points: 1 }),
+  ]);
+  expectEq(s.scoreSummary, { a: 3, b: 3 });
+  expectEq((s.detail as BasketballDetail).fouls, { a: 0, b: 0 });
+});
+
+resetIds();
+test("fouls tally without affecting score", () => {
+  const s = basketball([
+    ev("foul", { side: "a" }),
+    ev("foul", { side: "a" }),
+    ev("foul", { side: "b" }),
+    ev("point", { side: "b", points: 2 }),
+  ]);
+  expectEq(s.scoreSummary, { a: 0, b: 2 });
+  expectEq((s.detail as BasketballDetail).fouls, { a: 2, b: 1 });
+});
+
+resetIds();
+test("regulation tie after 4 periods → not complete (needs OT)", () => {
+  const events: ScoringEvent[] = [];
+  for (let q = 0; q < 4; q++) {
+    events.push(ev("period_start"));
+    for (let i = 0; i < 5; i++) events.push(ev("point", { side: "a", points: 2 }));
+    for (let i = 0; i < 5; i++) events.push(ev("point", { side: "b", points: 2 }));
+    events.push(ev("period_end"));
+  }
+  const s = basketball(events);
+  expectEq(s.scoreSummary, { a: 40, b: 40 });
+  expectEq(s.isComplete, false);
+  expectEq((s.detail as BasketballDetail).periodsCompleted, 4);
+});
+
+resetIds();
+test("OT period breaks tie → complete with winner", () => {
+  const events: ScoringEvent[] = [];
+  for (let q = 0; q < 4; q++) {
+    events.push(ev("period_start"));
+    for (let i = 0; i < 5; i++) events.push(ev("point", { side: "a", points: 2 }));
+    for (let i = 0; i < 5; i++) events.push(ev("point", { side: "b", points: 2 }));
+    events.push(ev("period_end"));
+  }
+  events.push(ev("period_start"));
+  events.push(ev("point", { side: "a", points: 2 }));
+  events.push(ev("point", { side: "a", points: 2 }));
+  events.push(ev("point", { side: "a", points: 1 }));
+  events.push(ev("point", { side: "b", points: 2 }));
+  events.push(ev("point", { side: "b", points: 1 }));
+  events.push(ev("period_end"));
+  const s = basketball(events);
+  expectEq(s.scoreSummary, { a: 45, b: 43 });
+  expectEq(s.isComplete, true);
+  expectEq(s.winnerSide, "a");
+});
+
+resetIds();
+test("undo reverts last point", () => {
+  const s = basketball([
+    ev("point", { side: "a", points: 3 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("undo"),
+  ]);
+  expectEq(s.scoreSummary, { a: 3, b: 0 });
+});
+
+resetIds();
+test("line scores per quarter", () => {
+  const s = basketball([
+    ev("period_start"),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("period_end"),
+    ev("period_start"),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "a", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 2 }),
+    ev("point", { side: "b", points: 1 }),
+    ev("period_end"),
+  ]);
+  expectEq((s.detail as BasketballDetail).lineScores, [
+    { a: 12, b: 8 },
+    { a: 10, b: 11 },
+  ]);
+});
+
+// ─── Badminton ───────────────────────────────────────────────────────────────
+console.log("\nBadminton:");
+
+resetIds();
+test("game to 21 with win-by-2", () => {
+  const events: ScoringEvent[] = [];
+  for (let i = 0; i < 19; i++) events.push(ev("point", { side: "a" }));
+  for (let i = 0; i < 17; i++) events.push(ev("point", { side: "b" }));
+  events.push(ev("point", { side: "a" }));
+  events.push(ev("point", { side: "a" }));
+  const s = badminton(events);
+  expectEq((s.detail as BadmintonDetail).completedGames, [{ a: 21, b: 17 }]);
+  expectEq(s.scoreSummary, { a: 1, b: 0 });
+});
+
+resetIds();
+test("deuce at 20-20 needs two-point lead", () => {
+  const events: ScoringEvent[] = [];
+  for (let i = 0; i < 20; i++) events.push(ev("point", { side: "a" }));
+  for (let i = 0; i < 20; i++) events.push(ev("point", { side: "b" }));
+  let s = badminton(events);
+  expectEq(s.isComplete, false);
+  expectEq((s.detail as BadmintonDetail).currentGame, { a: 20, b: 20 });
+  events.push(ev("point", { side: "a" }));
+  s = badminton(events);
+  expectEq(s.isComplete, false);
+  events.push(ev("point", { side: "b" }));
+  s = badminton(events);
+  expectEq((s.detail as BadmintonDetail).currentGame, { a: 21, b: 21 });
+  expectEq(s.isComplete, false);
+  events.push(ev("point", { side: "a" }));
+  events.push(ev("point", { side: "a" }));
+  s = badminton(events);
+  expectEq((s.detail as BadmintonDetail).completedGames[0], { a: 23, b: 21 });
+});
+
+resetIds();
+test("29-29 cap → next point wins at 30", () => {
+  const events: ScoringEvent[] = [];
+  for (let i = 0; i < 29; i++) {
+    events.push(ev("point", { side: "a" }));
+    events.push(ev("point", { side: "b" }));
+  }
+  events.push(ev("point", { side: "a" }));
+  const s = badminton(events);
+  expectEq((s.detail as BadmintonDetail).completedGames, [{ a: 30, b: 29 }]);
+});
+
+resetIds();
+test("best-of-3 match win at 2 games", () => {
+  const game = (aPts: number, bPts: number) => {
+    const e: ScoringEvent[] = [];
+    const n = Math.max(aPts, bPts);
+    for (let i = 0; i < n; i++) {
+      if (i < aPts) e.push(ev("point", { side: "a" }));
+      if (i < bPts) e.push(ev("point", { side: "b" }));
+    }
+    return e;
+  };
+  const s = badminton([...game(21, 10), ...game(21, 15)]);
+  expectEq(s.isComplete, true);
+  expectEq(s.winnerSide, "a");
+  expectEq(s.display, "21-10, 21-15");
+});
+
+resetIds();
+test("badminton undo reverts last point", () => {
+  const s = badminton([
+    ev("point", { side: "a" }),
+    ev("point", { side: "b" }),
+    ev("undo"),
+  ]);
+  expectEq((s.detail as BadmintonDetail).currentGame, { a: 1, b: 0 });
 });
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

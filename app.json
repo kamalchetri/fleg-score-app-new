@@ -7,16 +7,33 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#08080F",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
       "bundleIdentifier": "in.fleg.score",
-      "supportsTablet": false
+      "supportsTablet": true
     },
     "android": {
       "package": "in.fleg.score",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-splash-screen",
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow FLEG Score to upload event banners and registration files."
+        }
+      ],
+      "expo-document-picker"
+    ],
     "experiments": {
       "tsconfigPaths": true,
       "typedRoutes": true

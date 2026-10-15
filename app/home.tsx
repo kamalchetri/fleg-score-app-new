@@ -1,145 +1,298 @@
-import { useCallback, useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
-import { useAuth } from "@/lib/auth-context";
-import { fetchMyMatches, fetchMyTournaments, type MyMatch, type MyTournament } from "@/lib/queries";
-import { formatDateRange, formatDateTime } from "@/lib/format";
+import { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { router } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors, Spacing } from "@/lib/theme";
-import { Badge, Button, Card, EmptyState, Screen } from "@/components/ui";
+import { formatDateTime } from "@/lib/format";
+import { scoreParts } from "@/lib/queries";
+import { useHomeFeed } from "@/lib/home-feed";
+import { usePickTallies } from "@/lib/picks";
+import { PickEntry, PickSheet, type PickTarget } from "@/components/PickSheet";
+import {
+  BottomNav,
+  Crest,
+  FixtureCard,
+  IconButton,
+  LiveHeroCard,
+  Screen,
+  SectionHeader,
+  SportPill,
+  Txt,
+} from "@/components/kit";
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export default function Home() {
-  const { session } = useAuth();
-  const [matches, setMatches] = useState<MyMatch[]>([]);
-  const [tournaments, setTournaments] = useState<MyTournament[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!session) return;
-    try {
-      setError(null);
-      const [m, t] = await Promise.all([
-        fetchMyMatches(session.user.id),
-        fetchMyTournaments(session.user.id),
-      ]);
-      setMatches(m);
-      setTournaments(t);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load data.");
-    }
-  }, [session]);
-
-  useEffect(() => {
-    if (!session) router.replace("/login");
-  }, [session]);
-
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
+  const [sport, setSport] = useState("all");
+  const [pick, setPick] = useState<PickTarget | null>(null);
+  const feed = useHomeFeed(sport);
+  const pickIds = useMemo(
+    () => [...feed.live, ...feed.fixtures].map((m) => m.id),
+    [feed.live, feed.fixtures],
   );
+  const tallies = usePickTallies(pickIds);
 
-  async function onRefresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }
-
-  const liveFirst = [...matches].sort((x, y) =>
-    x.status === y.status ? 0 : x.status === "live" ? -1 : 1,
-  );
+  const hero = feed.live[0];
+  // When nothing is live, surface the most recent result in the hero slot.
+  const heroResult = !hero ? feed.results[0] : undefined;
 
   return (
     <Screen>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Image
+            source={require("../assets/fleg-score-logo-white.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View>
+            <Txt variant="labelCaps" color={Colors.primary}>
+              FLEG SCORE
+            </Txt>
+            <Txt variant="headlineSm">Home</Txt>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <IconButton icon="magnify" onPress={() => router.replace("/events")} />
+          <IconButton icon="bell-outline" onPress={() => {}} />
+          <IconButton
+            icon="account"
+            bg={Colors.primary}
+            color={Colors.onPrimary}
+            size={36}
+            onPress={() => router.replace("/profile")}
+          />
+        </View>
+      </View>
+
       <ScrollView
-        contentContainerStyle={{ padding: Spacing.lg }}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.green} />
+          <RefreshControl
+            refreshing={feed.refreshing}
+            onRefresh={feed.refresh}
+            tintColor={Colors.primary}
+          />
         }
       >
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {/* Greeting */}
+        <Txt variant="bodySm" color={Colors.textDim}>
+          {greeting()} 👋
+        </Txt>
 
-        <Text style={styles.section}>My matches</Text>
-        {liveFirst.length === 0 ? (
-          <EmptyState
-            title="No matches assigned"
-            body="Matches appear here when an organizer assigns you as referee."
-          />
-        ) : (
-          liveFirst.map((m) => (
-            <Pressable key={m.id} onPress={() => router.push(`/match/${m.id}`)}>
-              <Card>
-                <View style={styles.rowBetween}>
-                  <Text style={styles.matchTeams} numberOfLines={1}>
-                    {m.a?.display_name ?? "TBD"} vs {m.b?.display_name ?? "TBD"}
-                  </Text>
-                  <Badge status={m.status} />
-                </View>
-                <Text style={styles.meta}>
-                  {m.tournament?.name} · {m.category?.name}
-                </Text>
-                <Text style={styles.meta}>
-                  {m.court ? `${m.court} · ` : ""}
-                  {formatDateTime(m.scheduled_at)}
-                </Text>
-                <Button label="Open scoring" onPress={() => router.push(`/match/${m.id}`)} />
-              </Card>
-            </Pressable>
-          ))
+        {/* Expressive headline */}
+        <View style={{ marginTop: -2 }}>
+          <Txt variant="headlineLg" color={Colors.text}>
+            Choose your
+          </Txt>
+          <Txt variant="headlineLg" color={Colors.primary} style={styles.italic}>
+            Favourite game
+          </Txt>
+        </View>
+
+        {/* Sport pills — derived from what's actually published */}
+        {feed.sports.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+          >
+            <SportPill
+              label="All"
+              icon="star-four-points"
+              active={sport === "all"}
+              onPress={() => setSport("all")}
+            />
+            {feed.sports.map((s) => (
+              <SportPill
+                key={s.key}
+                label={s.label}
+                icon={s.icon}
+                active={sport === s.key}
+                onPress={() => setSport(s.key)}
+              />
+            ))}
+          </ScrollView>
         )}
 
-        <Text style={styles.section}>My tournaments</Text>
-        {tournaments.length === 0 ? (
-          <EmptyState
-            title="No tournaments"
-            body="Tournaments you organize or staff appear here. Create tournaments at fleg.in."
-          />
+        {feed.loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={Colors.primary} />
+          </View>
+        ) : feed.error ? (
+          <View style={styles.center}>
+            <Txt variant="bodyMd" color={Colors.red}>
+              {feed.error}
+            </Txt>
+            <Txt variant="bodySm" color={Colors.textDim}>
+              Pull down to retry.
+            </Txt>
+          </View>
         ) : (
-          tournaments.map((t) =>
-            t.tournament ? (
-              <Pressable
-                key={t.tournament.id}
-                onPress={() => router.push(`/tournament/${t.tournament!.id}`)}
-              >
-                <Card>
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.tName} numberOfLines={1}>
-                      {t.tournament.name}
-                    </Text>
-                    <Badge status={t.tournament.status} />
-                  </View>
-                  <Text style={styles.meta}>
-                    {t.tournament.sport} · {t.staff_role.replace("_", "-")} ·{" "}
-                    {formatDateRange(t.tournament.starts_at, t.tournament.ends_at)}
-                  </Text>
-                </Card>
-              </Pressable>
-            ) : null,
-          )
-        )}
+          <>
+            {/* Top Events — live hero (or latest result when nothing is live) */}
+            <SectionHeader title="Top Events" live={!!hero} onViewAll={() => router.replace("/events")} />
+            {hero ? (
+              <LiveHeroCard
+                competition={hero.tournament?.name ?? "Match"}
+                home={hero.a?.display_name ?? "TBD"}
+                away={hero.b?.display_name ?? "TBD"}
+                homeScore={scoreParts(hero.score).home}
+                awayScore={scoreParts(hero.score).away}
+                clock="LIVE"
+                onPress={() => router.push(`/live/${hero.id}`)}
+              />
+            ) : heroResult ? (
+              <LiveHeroCard
+                competition={heroResult.tournament?.name ?? "Match"}
+                home={heroResult.a?.display_name ?? "TBD"}
+                away={heroResult.b?.display_name ?? "TBD"}
+                homeScore={scoreParts(heroResult.score).home}
+                awayScore={scoreParts(heroResult.score).away}
+                clock="FULL TIME"
+                onPress={() => router.push(`/live/${heroResult.id}`)}
+              />
+            ) : (
+              <EmptyRow text="No live matches right now." />
+            )}
+            {hero ? (
+              <PickEntry
+                total={tallies[hero.id]?.total ?? 0}
+                onPick={() =>
+                  setPick({
+                    id: hero.id,
+                    home: hero.a?.display_name ?? "TBD",
+                    away: hero.b?.display_name ?? "TBD",
+                    status: hero.status,
+                    startedAt: hero.started_at,
+                  })
+                }
+              />
+            ) : null}
 
-        <Button label="Settings" variant="ghost" onPress={() => router.push("/settings")} />
+            {/* Fixtures */}
+            <SectionHeader title="Fixtures" onViewAll={() => router.replace("/events")} />
+            {feed.fixtures.length > 0 ? (
+              <View style={{ gap: 12 }}>
+                {feed.fixtures.slice(0, 8).map((m) => (
+                  <FixtureCard
+                    key={m.id}
+                    home={m.a?.display_name ?? "TBD"}
+                    away={m.b?.display_name ?? "TBD"}
+                    status={m.status}
+                    meta={fixtureMeta(m.tournament?.name, m.scheduled_at, m.category?.name)}
+                    onPress={() => router.push(`/live/${m.id}`)}
+                    footer={
+                      <PickEntry
+                        total={tallies[m.id]?.total ?? 0}
+                        onPick={() =>
+                          setPick({
+                            id: m.id,
+                            home: m.a?.display_name ?? "TBD",
+                            away: m.b?.display_name ?? "TBD",
+                            status: m.status,
+                            startedAt: m.started_at,
+                          })
+                        }
+                      />
+                    }
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyRow text="No upcoming fixtures yet." />
+            )}
+
+            {/* Tournaments */}
+            {feed.tournaments.length > 0 && (
+              <>
+                <SectionHeader title="Tournaments" onViewAll={() => router.replace("/events")} />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 14, paddingVertical: 2 }}
+                >
+                  {feed.tournaments.map((t) => (
+                    <Pressable
+                      key={t.id}
+                      style={{ alignItems: "center", gap: 6, width: 68 }}
+                      onPress={() => router.push(`/tournament/${t.id}`)}
+                    >
+                      <Crest name={t.name} size={52} />
+                      <Txt variant="bodySm" color={Colors.textDim} numberOfLines={1}>
+                        {t.name}
+                      </Txt>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
+
+      <PickSheet target={pick} onClose={() => setPick(null)} />
+      <BottomNav active="home" />
     </Screen>
   );
 }
 
+function fixtureMeta(
+  tournament: string | undefined,
+  scheduledAt: string | null,
+  category: string | undefined,
+): string {
+  const when = scheduledAt ? formatDateTime(scheduledAt) : category;
+  return [tournament, when].filter(Boolean).join(" · ");
+}
+
+function EmptyRow({ text }: { text: string }) {
+  return (
+    <View style={styles.empty}>
+      <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={Colors.textDim} />
+      <Txt variant="bodySm" color={Colors.textDim}>
+        {text}
+      </Txt>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  section: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  rowBetween: {
+  header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    gap: Spacing.sm,
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.margin,
+    paddingVertical: 12,
   },
-  matchTeams: { color: Colors.text, fontSize: 16, fontWeight: "700", flex: 1 },
-  tName: { color: Colors.text, fontSize: 16, fontWeight: "700", flex: 1 },
-  meta: { color: Colors.textDim, fontSize: 13, marginTop: Spacing.xs },
-  error: { color: Colors.red, marginBottom: Spacing.md },
+  logo: { width: 34, height: 34 },
+  body: { paddingHorizontal: Spacing.margin, paddingBottom: 120, gap: Spacing.lg },
+  italic: { fontStyle: "italic" },
+  center: { paddingVertical: 40, alignItems: "center", gap: 6 },
+  empty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    borderStyle: "dashed",
+  },
 });

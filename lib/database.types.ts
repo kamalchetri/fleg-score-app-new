@@ -388,6 +388,7 @@ export type Database = {
           created_at: string
           entrant_a: string | null
           entrant_b: string | null
+          format_override: Json | null
           id: string
           position: number
           referee_id: string | null
@@ -408,6 +409,7 @@ export type Database = {
           created_at?: string
           entrant_a?: string | null
           entrant_b?: string | null
+          format_override?: Json | null
           id?: string
           position?: number
           referee_id?: string | null
@@ -428,6 +430,7 @@ export type Database = {
           created_at?: string
           entrant_a?: string | null
           entrant_b?: string | null
+          format_override?: Json | null
           id?: string
           position?: number
           referee_id?: string | null
@@ -832,11 +835,45 @@ export type Database = {
           },
         ]
       }
+      // Pending deployment. This table is not on Fleg-web production.
+      // The shape matches docs/nspg-audit/migration.sql only.
+      // Insert and Update are never: the app may SELECT, and append only through log_audit_event.
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          details: Json
+          entity_id: string | null
+          entity_type: string | null
+          id: number
+          occurred_at: string
+          tournament_id: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      // Pending deployment. This RPC is not on Fleg-web production.
+      // The signature matches docs/append-score-event-guarded/migration.sql only.
+      append_score_event_guarded: {
+        Args: {
+          p_expected_last_event_id: number
+          p_event_type: string
+          p_match_id: string
+          p_payload: Json
+        }
+        Returns: {
+          conflict: boolean
+          event_id: number | null
+          last_event_id: number
+          ok: boolean
+        }[]
+      }
       aiko_insert_categories_atomic: {
         Args: { p_categories: Json; p_registration_id: string }
         Returns: Json
@@ -854,6 +891,18 @@ export type Database = {
       is_tournament_staff: {
         Args: { roles: string[]; t_id: string }
         Returns: boolean
+      }
+      // Pending deployment. This RPC is not on Fleg-web production.
+      // The signature matches docs/nspg-audit/migration.sql only.
+      log_audit_event: {
+        Args: {
+          p_action: string
+          p_details: Json
+          p_entity_id: string
+          p_entity_type: string
+          p_tournament_id: string
+        }
+        Returns: number
       }
       register_entrant: {
         Args: {

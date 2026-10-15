@@ -1,6 +1,163 @@
 // Data-access helpers. All through RLS (anon key) — the DB is the gate.
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { getSportPreset, type SportId } from "@/lib/sports/presets";
+import {
+  guardedAppendArgs,
+  interpretGuardedAppend,
+  type AppendScoreEventInput,
+  type AppendScoreEventResult,
+} from "@/lib/guarded-scoring";
 import type { ScoringEvent } from "@/lib/scoring";
+
+export interface OrganizerProfile {
+  user_id: string;
+  account_type: string;
+  org_name: string | null;
+  city: string | null;
+  state: string | null;
+  sports: string[];
+  status: string;
+}
+
+export async function fetchOrganizerProfile(userId: string): Promise<OrganizerProfile | null> {
+  const { data, error } = await supabase
+    .from("organizer_profiles")
+    .select("user_id, account_type, org_name, city, state, sports, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data as OrganizerProfile | null;
+}
+
+export async function createOrganizerProfile(input: {
+  userId: string;
+  accountType: "individual" | "organization";
+  orgName: string | null;
+  city: string | null;
+  state: string | null;
+  sports: string[];
+}): Promise<void> {
+  const { error } = await supabase.from("organizer_profiles").insert({
+    user_id: input.userId,
+    account_type: input.accountType,
+    org_name: input.orgName,
+    city: input.city,
+    state: input.state,
+    sports: input.sports,
+  });
+  if (error && !/duplicate key/i.test(error.message)) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Creates a minimal pending organizer profile on first authenticated load
+ * (Google OAuth or email-confirmed first sign-in). Idempotent.
+ */
+export async function ensurePendingOrganizerProfile(user: User): Promise<OrganizerProfile | null> {
+  const existing = await fetchOrganizerProfile(user.id);
+  if (existing) return existing;
+
+  const meta = user.user_metadata ?? {};
+  const fullName =
+    (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+    (typeof meta.name === "string" && meta.name.trim()) ||
+    user.email?.split("@")[0]?.trim() ||
+    "Organizer";
+
+  await createOrganizerProfile({
+    userId: user.id,
+    accountType: "individual",
+    orgName: fullName,
+    city: null,
+    state: null,
+    sports: [],
+  });
+
+  return fetchOrganizerProfile(user.id);
+}
+
+function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  const suffix = Math.random().toString(36).slice(2, 7);
+  return `${base || "tournament"}-${suffix}`;
+}
+
+export interface CreateTournamentInput {
+  name: string;
+  sport: SportId;
+  description?: string;
+  venueName?: string;
+  city: string;
+  state: string;
+  startDate: string;
+  endDate?: string;
+  categories: Array<{
+    name: string;
+    entrantType: "team" | "singles" | "doubles";
+    format: "knockout" | "league" | "groups_knockout";
+    maxEntrants: number | null;
+  }>;
+}
+
+/** Mirror of web createTournament — inserts draft + categories under RLS. */
+export async function createTournament(
+  userId: string,
+  input: CreateTournamentInput,
+): Promise<{ id: string }> {
+  const preset = getSportPreset(input.sport);
+  if (!preset) throw new Error("Unknown sport.");
+
+  const { data: tournament, error: tErr } = await supabase
+    .from("tournaments")
+    .insert({
+      organizer_id: userId,
+      name: input.name.trim(),
+      slug: slugify(input.name),
+      sport: input.sport,
+      sport_config: JSON.parse(JSON.stringify(preset.config)),
+      description: input.description?.trim() || null,
+      venue_name: input.venueName?.trim() || null,
+      city: input.city.trim(),
+      state: input.state.trim(),
+      starts_at: input.startDate,
+      ends_at: input.endDate || null,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (tErr || !tournament) {
+    if (tErr?.code === "42501") {
+      throw new Error("Only approved organizers can create tournaments.");
+    }
+    throw new Error(tErr?.message ?? "Could not create tournament.");
+  }
+
+  const { error: cErr } = await supabase.from("tournament_categories").insert(
+    input.categories.map((cat, i) => ({
+      tournament_id: tournament.id,
+      name: cat.name.trim(),
+      entrant_type: cat.entrantType,
+      format: cat.format,
+      max_entrants: cat.maxEntrants,
+      entry_fee: 0,
+      sort_order: i,
+    })),
+  );
+
+  if (cErr) {
+    await supabase.from("tournaments").delete().eq("id", tournament.id);
+    throw new Error(`Could not create categories: ${cErr.message}`);
+  }
+
+  return { id: tournament.id };
+}
 
 export interface MyMatch {
   id: string;
@@ -68,8 +225,17 @@ export interface MatchDetail {
   winner_id: string | null;
   entrant_a: string | null;
   entrant_b: string | null;
+  format_override: Partial<{
+    best_of: number;
+    points_to: number;
+    win_by: number;
+    legs_to_win: number;
+  }> | null;
+  /** Saved `matches.score` snapshot. The event log remains authoritative for live engines. */
+  score: unknown;
   tournament_id: string;
   tournament: { id: string; name: string; sport: string; sport_config: unknown } | null;
+  stage: { stage_type: string; config: { rounds?: number } | null } | null;
   category: { name: string } | null;
   a: { id: string; display_name: string } | null;
   b: { id: string; display_name: string } | null;
@@ -80,8 +246,9 @@ export async function fetchMatch(matchId: string): Promise<MatchDetail | null> {
     .from("matches")
     .select(
       `id, status, round, position, stage_id, court, scheduled_at, started_at,
-       winner_id, entrant_a, entrant_b, tournament_id,
+       winner_id, entrant_a, entrant_b, format_override, score, tournament_id,
        tournament:tournaments!matches_tournament_id_fkey(id, name, sport, sport_config),
+       stage:stages!matches_stage_id_fkey(stage_type, config),
        category:tournament_categories!matches_category_id_fkey(name),
        a:entrants!matches_entrant_a_fkey(id, display_name),
        b:entrants!matches_entrant_b_fkey(id, display_name)`,
@@ -129,6 +296,14 @@ export async function insertEvent(
   const row = { match_id: matchId, event_type: eventType, payload } as never;
   const { error } = await supabase.from("score_events").insert(row);
   if (error) throw new Error(error.message);
+}
+
+/** Calls append_score_event_guarded. A missing RPC is an error, not a direct insert. */
+export async function appendScoreEventGuarded(
+  input: AppendScoreEventInput,
+): Promise<AppendScoreEventResult> {
+  const { data, error } = await supabase.rpc("append_score_event_guarded", guardedAppendArgs(input));
+  return interpretGuardedAppend(error, data);
 }
 
 export async function startMatch(matchId: string): Promise<void> {
@@ -839,4 +1014,107 @@ export async function setWalkover(
   if (!data || data.length === 0) throw new Error("Not permitted.");
 
   await advanceWinner(matchId);
+}
+
+// ─── Discover / Home feed (public, anon-readable via *_public_read RLS) ───────
+// Reads only tournaments with visibility public/unlisted and status != draft
+// (is_tournament_public), their matches, approved entrants, and categories.
+
+export interface MatchScore {
+  a?: number;
+  b?: number;
+  display?: string;
+  points_a?: number;
+  points_b?: number;
+}
+
+export interface FeedMatch {
+  id: string;
+  status: string; // live | scheduled | completed | walkover
+  scheduled_at: string | null;
+  started_at: string | null;
+  round: number;
+  score: MatchScore | null;
+  tournament: { id: string; name: string; sport: string; city: string | null } | null;
+  category: { name: string } | null;
+  a: { display_name: string } | null;
+  b: { display_name: string } | null;
+}
+
+const FEED_SELECT = `id, status, scheduled_at, started_at, round, score,
+  tournament:tournaments!matches_tournament_id_fkey(id, name, sport, city),
+  category:tournament_categories!matches_category_id_fkey(name),
+  a:entrants!matches_entrant_a_fkey(display_name),
+  b:entrants!matches_entrant_b_fkey(display_name)`;
+
+/** Currently-live matches across all public tournaments. */
+export async function fetchLiveMatches(): Promise<FeedMatch[]> {
+  const { data, error } = await supabase
+    .from("matches")
+    .select(FEED_SELECT)
+    .eq("status", "live")
+    .order("started_at", { ascending: false, nullsFirst: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as FeedMatch[];
+}
+
+/** Upcoming (scheduled) matches, soonest first; undated ones sort last. */
+export async function fetchUpcomingMatches(limit = 20): Promise<FeedMatch[]> {
+  const { data, error } = await supabase
+    .from("matches")
+    .select(FEED_SELECT)
+    .eq("status", "scheduled")
+    .order("scheduled_at", { ascending: true, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as FeedMatch[];
+}
+
+/** Most recently finished matches (results feed fallback when nothing is live). */
+export async function fetchRecentResults(limit = 10): Promise<FeedMatch[]> {
+  const { data, error } = await supabase
+    .from("matches")
+    .select(FEED_SELECT)
+    .in("status", ["completed", "walkover"])
+    .order("completed_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as FeedMatch[];
+}
+
+export interface PublicTournament {
+  id: string;
+  name: string;
+  sport: string;
+  status: string;
+  city: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  banner_url: string | null;
+}
+
+/** Public tournaments for the Discover grid / sport filter. */
+export async function fetchPublicTournaments(limit = 30): Promise<PublicTournament[]> {
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("id, name, sport, status, city, starts_at, ends_at, banner_url")
+    .eq("visibility", "public")
+    .neq("status", "draft")
+    .order("starts_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as PublicTournament[];
+}
+
+/** Read a match score json into two display strings (home, away). */
+export function scoreParts(score: MatchScore | null): { home: string; away: string } {
+  if (!score) return { home: "0", away: "0" };
+  if (typeof score.display === "string" && score.display.includes("-")) {
+    const [h, a] = score.display.split("-");
+    return { home: (h ?? "0").trim(), away: (a ?? "0").trim() };
+  }
+  if (score.points_a != null || score.points_b != null) {
+    return { home: String(score.points_a ?? 0), away: String(score.points_b ?? 0) };
+  }
+  return { home: String(score.a ?? 0), away: String(score.b ?? 0) };
 }

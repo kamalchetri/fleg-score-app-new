@@ -2,7 +2,7 @@
 // the pure standings engine (lib/formats/standings.ts). Never persisted.
 import { useMemo } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Colors, Spacing } from "@/lib/theme";
+import { Colors, Font, Spacing } from "@/lib/theme";
 import { Card, EmptyState } from "@/components/ui";
 import { useHub } from "./HubContext";
 import {
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   title: {
     color: Colors.text,
     fontSize: 16,
-    fontWeight: "800",
+    fontFamily: Font.extrabold,
     marginBottom: Spacing.sm,
   },
   row: {
@@ -169,10 +169,10 @@ const styles = StyleSheet.create({
   headerRow: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   qualifyRow: { backgroundColor: Colors.greenDim },
   cell: { color: Colors.text, fontSize: 13, fontVariant: ["tabular-nums"] },
-  rank: { width: 28, fontWeight: "700" },
-  name: { flex: 1, fontWeight: "600" },
+  rank: { width: 28, fontFamily: Font.bold },
+  name: { flex: 1, fontFamily: Font.semibold },
   num: { width: 36, textAlign: "right" },
-  pts: { color: Colors.green, fontWeight: "800", width: 44 },
+  pts: { color: Colors.green, fontFamily: Font.extrabold, width: 44 },
   legend: {
     color: Colors.textFaint,
     fontSize: 12,

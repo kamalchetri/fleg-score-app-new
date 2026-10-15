@@ -2,7 +2,7 @@
 // List-first view: round label + entrant names + status + score + walkover.
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import { Colors, Spacing, statusColors } from "@/lib/theme";
+import { Colors, Font, Spacing, statusColors } from "@/lib/theme";
 import { Badge } from "@/components/ui";
 import { roundLabel } from "@/lib/bracket/knockout";
 import type { HubMatch } from "@/lib/queries";
@@ -100,11 +100,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.xs },
-  round: { color: Colors.textDim, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  round: { color: Colors.textDim, fontSize: 12, fontFamily: Font.bold, textTransform: "uppercase", letterSpacing: 0.5 },
   line: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: Spacing.sm },
-  team: { color: Colors.text, fontSize: 15, fontWeight: "600", flex: 1 },
+  team: { color: Colors.text, fontSize: 15, fontFamily: Font.semibold, flex: 1 },
   right: { textAlign: "right" },
-  winner: { color: Colors.green, fontWeight: "800" },
+  winner: { color: Colors.green, fontFamily: Font.extrabold },
   score: { color: Colors.textDim, fontSize: 14, fontVariant: ["tabular-nums"], minWidth: 60, textAlign: "center" },
   meta: { color: Colors.textFaint, fontSize: 12, marginTop: Spacing.xs },
 });
