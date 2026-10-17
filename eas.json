@@ -17,6 +17,12 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjdWJkcWZ6ZGJ3dGZjZHNudG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5ODM0NzAsImV4cCI6MjA5ODU1OTQ3MH0.YjPpTLtFUC8TzRLfj53-cGYxI4Xcf198oZz9Vmw5P6g"
       }
     },
+    "review": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_REVIEW_BUILD": "1"
+      }
+    },
     "production": {
       "autoIncrement": true
     }
