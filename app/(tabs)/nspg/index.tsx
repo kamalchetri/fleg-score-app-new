@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { HeroCard, PrimaryButton, Screen, Txt } from "@/components/kit";
+import { PrimaryButton, Screen, Txt } from "@/components/kit";
 import { PublicMatchCard } from "@/components/nspg/PublicMatchCard";
 import { PublicHeader } from "@/components/nspg/PublicHeader";
 import { getLiveMatches, listNspgSports, type NspgSport, type Fixture } from "@/lib/nspg-live";
@@ -12,22 +12,30 @@ export default function NspgHub() {
   const [sports, setSports] = useState<NspgSport[]>([]);
   const [live, setLive] = useState<Fixture[]>([]);
   useEffect(() => { void Promise.all([listNspgSports(), getLiveMatches()]).then(([s, m]) => { setSports(s); setLive(m); }); }, []);
-  const hero = live[0];
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PublicHeader />
         <Txt variant="labelCaps" color={Colors.primary}>NAGALAND STATE & PARA GAMES</Txt>
         <Txt variant="displayHero">NSPG 2026</Txt>
-        <HeroCard
-          competition="2–14 NOV · CHÜMOUKEDIMA & DIMAPUR"
-          home={hero?.sideA.name ?? "17 districts"}
-          away={hero?.sideB.name ?? "9 disciplines"}
-          homeScore={hero?.sideA.score ?? "—"}
-          awayScore={hero?.sideB.score ?? "—"}
-          clock={hero?.clock ?? "UPCOMING"}
-          onPress={hero ? () => router.push(`/(tabs)/live/${hero.id}` as never) : undefined}
-        />
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <MaterialCommunityIcons name="trophy" size={18} color={Colors.onPrimary} />
+            <Txt variant="labelCaps" color={Colors.onPrimary} style={styles.heroCompetition}>
+              2–14 NOV · CHÜMOUKEDIMA & DIMAPUR
+            </Txt>
+          </View>
+          <Txt variant="headlineSm" color={Colors.onPrimary}>National multi-sport competition</Txt>
+          <Txt variant="bodySm" color={Colors.onPrimary} style={styles.heroMeta}>
+            Nagaland · 17 districts · 14 sports
+          </Txt>
+          {live.length > 0 ? (
+            <Pressable style={styles.heroLive} onPress={() => router.push("/(tabs)/live" as never)}>
+              <View style={styles.heroLiveDot} />
+              <Txt variant="labelCaps" color={Colors.primary}>{live.length} MATCHES LIVE</Txt>
+            </Pressable>
+          ) : null}
+        </View>
         {live.length > 0 ? <><View style={styles.sectionHead}><Txt variant="headlineSm">Live now</Txt><Txt variant="labelCaps" color={Colors.danger}>● ON AIR</Txt></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.liveRow}>{live.map((m) => <View key={m.id} style={styles.liveCard}><PublicMatchCard fixture={m} onPress={() => router.push(`/(tabs)/live/${m.id}` as never)} /></View>)}</ScrollView></> : null}
         <View style={styles.sectionHead}><Txt variant="headlineSm">Sports</Txt><Txt variant="bodySm" color={Colors.textDim}>2026 programme</Txt></View>
         <View style={styles.grid}>{sports.map((sport) => <SportCard key={sport.slug} sport={sport} />)}</View>
@@ -44,6 +52,12 @@ function SportCard({ sport }: { sport: NspgSport }) {
 const styles = StyleSheet.create({
   content: { gap: Spacing.lg, padding: Spacing.margin, paddingBottom: Spacing.xxl },
   liveRow: { gap: Spacing.md }, liveCard: { width: 320 },
+  hero: { backgroundColor: Colors.primary, borderRadius: Radius.xl, gap: Spacing.sm, padding: Spacing.lg },
+  heroTop: { alignItems: "flex-start", flexDirection: "row", gap: Spacing.sm },
+  heroCompetition: { flex: 1, flexWrap: "wrap" },
+  heroMeta: { opacity: 0.75 },
+  heroLive: { alignItems: "center", alignSelf: "flex-start", backgroundColor: Colors.onPrimary, borderRadius: Radius.pill, flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingVertical: 7 },
+  heroLiveDot: { backgroundColor: Colors.primary, borderRadius: 4, height: 8, width: 8 },
   sectionHead: { alignItems: "baseline", flexDirection: "row", justifyContent: "space-between" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.md },
   sport: { backgroundColor: Colors.surface1, borderColor: Colors.hairline, borderRadius: Radius.xl, borderWidth: 1, gap: Spacing.sm, padding: Spacing.lg, width: "47%" },

@@ -30,6 +30,10 @@ export default function TabsLayout() {
       <Tabs.Screen name="nspg" options={{ title: "NSPG", tabBarIcon: tabIcon("trophy-outline") }} />
       <Tabs.Screen name="live" options={{ title: "Live", tabBarIcon: tabIcon("broadcast") }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon("account-outline") }} />
+      {/* Detail routes live inside the public tabs but must never become tabs. */}
+      <Tabs.Screen name="nspg/[sport]" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="nspg/medals" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="live/[matchId]" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }
