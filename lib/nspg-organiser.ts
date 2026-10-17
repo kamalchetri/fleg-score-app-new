@@ -41,7 +41,14 @@ export async function updateFixture(id: string, patch: Partial<GeneratedFixture>
 export async function advanceWinner(id: string, winner: string | null): Promise<GeneratedFixture | null> { return updateFixture(id, { winner }); }
 
 /** Seed match adapter; production routes use app/match/[id] and its guarded RPC path. */
-export function seedScoringMatch(matchId: string): ScoringMatch {
-  const base = SCORING_LAB_FIXTURES.find((fixture) => fixture.id === "football-live") ?? SCORING_LAB_FIXTURES[0];
-  return { ...base.match, id: matchId, status: "live", tournament: { ...base.match.tournament!, id: "seed-nspg-football", name: "NSPG 2026 — Football", sport: "football", sport_config: base.match.tournament?.sport_config ?? {} } };
+export function disciplineForTournament(tournamentId: string): string {
+  const slug = tournamentId.toLowerCase();
+  return ["football", "basketball", "volleyball", "sepaktakraw", "badminton", "table_tennis", "lawn_tennis", "boxing", "taekwondo", "wushu", "wrestling", "pencak_silat", "athletics", "archery"].find((sport) => slug.includes(sport)) ?? "football";
+}
+
+export function seedScoringMatch(matchId: string, sport = "football"): ScoringMatch {
+  const fixtureId = sport === "volleyball" ? "volleyball-set" : sport === "sepaktakraw" ? "takraw-set" : sport === "table_tennis" ? "table-tennis" : sport === "lawn_tennis" ? "tennis-game" : ["boxing", "taekwondo", "wrestling", "wushu", "pencak_silat"].includes(sport) ? (sport === "taekwondo" ? "combat-points" : sport === "wrestling" ? "combat-method" : "combat") : sport;
+  const base = SCORING_LAB_FIXTURES.find((fixture) => fixture.id === fixtureId) ?? SCORING_LAB_FIXTURES[0];
+  const category = sport === "wushu" ? "Sanda" : sport === "pencak_silat" ? "Tanding" : base.match.category?.name ?? "Open";
+  return { ...base.match, id: matchId, status: "live", category: { name: category }, tournament: { ...base.match.tournament!, id: `seed-nspg-${sport}`, name: `NSPG 2026 — ${sport}`, sport, sport_config: base.match.tournament?.sport_config ?? {} } };
 }
