@@ -38,7 +38,7 @@ export async function saveVenue(input: Omit<OrganiserVenue, "id"> & { id?: strin
 export async function generateFixtures(format: OrganiserFormat, entrantIds: string[]): Promise<GeneratedFixture[]> { const { generateRoundRobin } = await import("./formats/roundrobin"); const { generateKnockoutBracket } = await import("./bracket/knockout"); if (format === "league") { generated = generateRoundRobin(entrantIds).pairings.map((p, i) => ({ id: `fixture-${i + 1}`, round: `Round ${p.round}`, a: p.entrantA, b: p.entrantB, seedA: null, seedB: null, winner: null, venueId: null, referee: null, startAt: null })); } else { const bracket = generateKnockoutBracket(entrantIds.map((id, i) => ({ id, seed: i + 1 }))); generated = bracket.matches.map((m, i) => ({ id: `fixture-${i + 1}`, round: `Round ${m.round}`, a: m.entrantA, b: m.entrantB, seedA: null, seedB: null, winner: m.winnerId, venueId: null, referee: null, startAt: null })); } return generated; }
 export async function listGeneratedFixtures(): Promise<GeneratedFixture[]> { return generated; }
 export async function updateFixture(id: string, patch: Partial<GeneratedFixture>): Promise<GeneratedFixture | null> { const found = generated.find((f) => f.id === id); if (!found) return null; Object.assign(found, patch); return found; }
-export async function advanceWinner(id: string, winner: string): Promise<GeneratedFixture | null> { return updateFixture(id, { winner }); }
+export async function advanceWinner(id: string, winner: string | null): Promise<GeneratedFixture | null> { return updateFixture(id, { winner }); }
 
 /** Seed match adapter; production routes use app/match/[id] and its guarded RPC path. */
 export function seedScoringMatch(matchId: string): ScoringMatch {
