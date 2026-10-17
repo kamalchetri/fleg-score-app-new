@@ -9,11 +9,13 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchOrganizerProfile, type OrganizerProfile } from "@/lib/queries";
 import { fetchMyXp } from "@/lib/picks";
 import { BottomNav, Crest, Screen, StatusPill, Txt, PrimaryButton } from "@/components/kit";
+import { useRole } from "@/lib/role";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 export default function Profile() {
   const { session } = useAuth();
+  const { canOrganise, canManageNspg } = useRole();
   if (!session) {
     return <Screen><View style={styles.guest}><Txt variant="displayHero">Your profile</Txt><Txt variant="bodyLg" color={Colors.textDim} align="center">Sign in to view your profile, saved games, and personal actions.</Txt><PrimaryButton label="Sign in" onPress={() => router.push("/login" as never)} /></View></Screen>;
   }
@@ -91,6 +93,10 @@ export default function Profile() {
               </Txt>
             </View>
           </View>
+        ) : null}
+
+        {canOrganise || canManageNspg ? (
+          <PrimaryButton label="Organiser / Admin Dashboard →" onPress={() => router.push("/organiser" as never)} />
         ) : null}
 
         {/* Actions */}

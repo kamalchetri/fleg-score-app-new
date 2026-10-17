@@ -17,6 +17,7 @@ import { useHomeFeed } from "@/lib/home-feed";
 import { usePickTallies } from "@/lib/picks";
 import { PickEntry, PickSheet, type PickTarget } from "@/components/PickSheet";
 import { listFeaturedEvents, type EventSummary } from "@/lib/events-live";
+import { useRole } from "@/lib/role";
 import {
   BottomNav,
   Crest,
@@ -40,6 +41,7 @@ export default function Home() {
   const [sport, setSport] = useState("all");
   const [pick, setPick] = useState<PickTarget | null>(null);
   const [featuredEvents, setFeaturedEvents] = useState<EventSummary[]>([]);
+  const { canOrganise, canManageNspg } = useRole();
   useEffect(() => { void listFeaturedEvents().then(setFeaturedEvents); }, []);
   const feed = useHomeFeed(sport);
   const pickIds = useMemo(
@@ -94,6 +96,7 @@ export default function Home() {
         }
       >
         {/* Greeting */}
+        {canOrganise || canManageNspg ? <Pressable style={styles.adminShortcut} onPress={() => router.push("/organiser" as never)}><MaterialCommunityIcons name="shield-star-outline" size={18} color={Colors.onPrimary} /><Txt variant="labelPill" color={Colors.onPrimary}>Admin · Organiser dashboard</Txt><MaterialCommunityIcons name="chevron-right" size={18} color={Colors.onPrimary} /></Pressable> : null}
         <Txt variant="bodySm" color={Colors.textDim}>
           {greeting()} 👋
         </Txt>
@@ -301,4 +304,5 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   eventTile: { backgroundColor: Colors.surface1, borderColor: Colors.hairline, borderRadius: 18, borderWidth: 1, gap: 6, padding: 14, width: 220 },
+  adminShortcut: { alignItems: "center", backgroundColor: Colors.surface2, borderColor: Colors.primary, borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingVertical: 11 },
 });
