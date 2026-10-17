@@ -18,7 +18,7 @@ export default function Index() {
     }
     ensurePendingOrganizerProfile(session.user)
       .then(() => fetchOrganizerProfile(session.user.id))
-      .then((p) => setDest(p ? "/home" : "/onboarding"))
+      .then((p) => setDest(p ? "/(tabs)/home" : "/onboarding"))
       .catch(() => setDest("/onboarding"));
   }, [session, loading]);
 

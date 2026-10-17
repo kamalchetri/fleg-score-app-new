@@ -107,5 +107,5 @@ export async function routeAfterAuth(): Promise<void> {
 
   await ensurePendingOrganizerProfile(user);
   const profile = await fetchOrganizerProfile(user.id).catch(() => null);
-  router.replace((profile ? "/home" : "/onboarding") as Href);
+  router.replace((profile ? "/(tabs)/home" : "/onboarding") as Href);
 }

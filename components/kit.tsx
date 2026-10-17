@@ -6,16 +6,17 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useSegments } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Colors, Palette, Radius, Spacing, Type, type TypeVariant } from "@/lib/theme";
+import { Colors, Font, Palette, Radius, Spacing, Type, type TypeVariant } from "@/lib/theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -377,6 +378,38 @@ export function PrimaryButton({
   );
 }
 
+/** Design-system names for new screens; existing aliases remain stable. */
+export const HeroCard = LiveHeroCard;
+export const MatchCard = FixtureCard;
+export const Pill = StatusPill;
+export const Button = PrimaryButton;
+
+export function Input({
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+  keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={Colors.textFaint}
+      secureTextEntry={secureTextEntry}
+      keyboardType={keyboardType}
+      style={styles.input}
+    />
+  );
+}
+
 /* ── Bottom navigation ──────────────────────────────────────────────────── */
 export type NavTab = "home" | "events" | "games" | "profile";
 const NAV: { key: NavTab; icon: IconName; label: string }[] = [
@@ -393,6 +426,8 @@ const NAV_PATH: Record<NavTab, "/home" | "/events" | "/games" | "/profile"> = {
 };
 
 export function BottomNav({ active, onNavigate }: { active: NavTab; onNavigate?: (t: NavTab) => void }) {
+  const segments = useSegments() as readonly string[];
+  if (segments[0] === "(tabs)") return null;
   function go(t: NavTab) {
     if (onNavigate) return onNavigate(t);
     if (t === active) return;
@@ -482,4 +517,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   navItem: { flex: 1, alignItems: "center", gap: 4 },
+  input: {
+    minHeight: 48,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.hairline,
+    backgroundColor: Colors.surface1,
+    color: Colors.text,
+    fontFamily: Font.regular,
+    fontSize: 16,
+    paddingHorizontal: Spacing.lg,
+  },
 });
