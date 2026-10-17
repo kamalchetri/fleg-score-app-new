@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { isOrganiserRole, normalizeRole } from "@/lib/role-utils";
 
-export type AppRole = "admin" | "nspg_lead" | "nspg_staff" | "organiser" | "user";
+export type AppRole = "admin" | "nspg_lead" | "nspg_staff" | "organiser" | "organizer" | "user";
 
-const ROLES = new Set<AppRole>(["admin", "nspg_lead", "nspg_staff", "organiser", "user"]);
-
-function normalizeRole(value: unknown): AppRole {
-  return typeof value === "string" && ROLES.has(value as AppRole) ? (value as AppRole) : "user";
-}
+export { isOrganiserRole, normalizeRole } from "@/lib/role-utils";
 
 export function useRole(): { role: AppRole; loading: boolean; canOrganise: boolean; canManageNspg: boolean } {
   const { session, loading: authLoading } = useAuth();
@@ -45,7 +42,7 @@ export function useRole(): { role: AppRole; loading: boolean; canOrganise: boole
   return {
     role,
     loading: authLoading || loading,
-    canOrganise: role === "admin" || role === "organiser",
-    canManageNspg: role === "admin" || role === "nspg_lead" || role === "nspg_staff",
+    canOrganise: role === "admin" || isOrganiserRole(role),
+    canManageNspg: role === "admin" || role === "nspg_lead" || role === "nspg_staff" || isOrganiserRole(role),
   };
 }
