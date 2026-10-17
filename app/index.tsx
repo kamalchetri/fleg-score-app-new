@@ -13,7 +13,7 @@ export default function Index() {
   useEffect(() => {
     if (loading) return;
     if (!session) {
-      setDest("/login");
+      setDest("/(tabs)/nspg");
       return;
     }
     ensurePendingOrganizerProfile(session.user)

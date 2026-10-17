@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { HeroCard, PrimaryButton, Screen, Txt } from "@/components/kit";
 import { PublicMatchCard } from "@/components/nspg/PublicMatchCard";
+import { PublicHeader } from "@/components/nspg/PublicHeader";
 import { getLiveMatches, listNspgSports, type NspgSport, type Fixture } from "@/lib/nspg-live";
 import { Colors, Radius, Spacing, Type } from "@/lib/theme";
 
@@ -15,6 +16,7 @@ export default function NspgHub() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <PublicHeader />
         <Txt variant="labelCaps" color={Colors.primary}>NAGALAND STATE & PARA GAMES</Txt>
         <Txt variant="displayHero">NSPG 2026</Txt>
         <HeroCard
@@ -26,7 +28,7 @@ export default function NspgHub() {
           clock={hero?.clock ?? "UPCOMING"}
           onPress={hero ? () => router.push(`/(tabs)/live/${hero.id}` as never) : undefined}
         />
-        {live.length > 0 ? <><Txt variant="headlineSm">Live now</Txt><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.liveRow}>{live.map((m) => <View key={m.id} style={styles.liveCard}><PublicMatchCard fixture={m} onPress={() => router.push(`/(tabs)/live/${m.id}` as never)} /></View>)}</ScrollView></> : null}
+        {live.length > 0 ? <><View style={styles.sectionHead}><Txt variant="headlineSm">Live now</Txt><Txt variant="labelCaps" color={Colors.danger}>● ON AIR</Txt></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.liveRow}>{live.map((m) => <View key={m.id} style={styles.liveCard}><PublicMatchCard fixture={m} onPress={() => router.push(`/(tabs)/live/${m.id}` as never)} /></View>)}</ScrollView></> : null}
         <View style={styles.sectionHead}><Txt variant="headlineSm">Sports</Txt><Txt variant="bodySm" color={Colors.textDim}>2026 programme</Txt></View>
         <View style={styles.grid}>{sports.map((sport) => <SportCard key={sport.slug} sport={sport} />)}</View>
         <PrimaryButton label="View medal tally" icon="medal-outline" onPress={() => router.push("/(tabs)/nspg/medals" as never)} />

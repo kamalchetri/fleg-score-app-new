@@ -8,12 +8,15 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { fetchOrganizerProfile, type OrganizerProfile } from "@/lib/queries";
 import { fetchMyXp } from "@/lib/picks";
-import { BottomNav, Crest, Screen, StatusPill, Txt } from "@/components/kit";
+import { BottomNav, Crest, Screen, StatusPill, Txt, PrimaryButton } from "@/components/kit";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 export default function Profile() {
   const { session } = useAuth();
+  if (!session) {
+    return <Screen><View style={styles.guest}><Txt variant="displayHero">Your profile</Txt><Txt variant="bodyLg" color={Colors.textDim} align="center">Sign in to view your profile, saved games, and personal actions.</Txt><PrimaryButton label="Sign in" onPress={() => router.push("/login" as never)} /></View></Screen>;
+  }
   const uid = session?.user.id;
   const email = session?.user.email ?? "—";
   const [fullName, setFullName] = useState<string | null>(null);
@@ -146,6 +149,7 @@ function Row({
 }
 
 const styles = StyleSheet.create({
+  guest: { alignItems: "center", flex: 1, gap: Spacing.lg, justifyContent: "center", padding: Spacing.margin },
   body: { paddingHorizontal: Spacing.margin, paddingTop: 16, paddingBottom: 120, gap: Spacing.lg },
   identity: { flexDirection: "row", alignItems: "center", gap: 14 },
   orgCard: {
