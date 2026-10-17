@@ -34,6 +34,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="nspg/[sport]" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="nspg/medals" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="live/[matchId]" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="discover/[slug]" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }

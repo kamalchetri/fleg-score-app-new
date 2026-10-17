@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -16,6 +16,7 @@ import { scoreParts } from "@/lib/queries";
 import { useHomeFeed } from "@/lib/home-feed";
 import { usePickTallies } from "@/lib/picks";
 import { PickEntry, PickSheet, type PickTarget } from "@/components/PickSheet";
+import { listFeaturedEvents, type EventSummary } from "@/lib/events-live";
 import {
   BottomNav,
   Crest,
@@ -38,6 +39,8 @@ function greeting(): string {
 export default function Home() {
   const [sport, setSport] = useState("all");
   const [pick, setPick] = useState<PickTarget | null>(null);
+  const [featuredEvents, setFeaturedEvents] = useState<EventSummary[]>([]);
+  useEffect(() => { void listFeaturedEvents().then(setFeaturedEvents); }, []);
   const feed = useHomeFeed(sport);
   const pickIds = useMemo(
     () => [...feed.live, ...feed.fixtures].map((m) => m.id),
@@ -218,6 +221,8 @@ export default function Home() {
               <EmptyRow text="No upcoming fixtures yet." />
             )}
 
+            {featuredEvents.length > 0 ? <><SectionHeader title="Discover events" onViewAll={() => router.replace("/(tabs)/discover" as never)} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>{featuredEvents.slice(0, 4).map((event) => <Pressable key={event.slug} style={styles.eventTile} onPress={() => event.isNspg ? router.push("/(tabs)/nspg" as never) : router.push(`/(tabs)/discover/${event.slug}` as never)}><Txt variant="labelCaps" color={Colors.primary}>{event.kind.toUpperCase()}</Txt><Txt variant="bodyLg" numberOfLines={2}>{event.title}</Txt><Txt variant="bodySm" color={Colors.textDim}>{event.city ?? "Nagaland"}</Txt></Pressable>)}</ScrollView></> : null}
+
             {/* Tournaments */}
             {feed.tournaments.length > 0 && (
               <>
@@ -295,4 +300,5 @@ const styles = StyleSheet.create({
     borderColor: Colors.hairline,
     borderStyle: "dashed",
   },
+  eventTile: { backgroundColor: Colors.surface1, borderColor: Colors.hairline, borderRadius: 18, borderWidth: 1, gap: 6, padding: 14, width: 220 },
 });
