@@ -65,6 +65,10 @@ export default function RootLayout() {
         <Stack.Screen name="tournament/new" options={{ title: "New tournament" }} />
         <Stack.Screen name="tournament/[id]" options={{ title: "Tournament" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
+        <Stack.Screen name="kiosk" options={{ headerShown: false }} />
+        <Stack.Screen name="athlete/[regId]" options={{ title: "Athlete" }} />
+        <Stack.Screen name="accreditation" options={{ title: "Accreditation" }} />
+        <Stack.Screen name="access-log" options={{ title: "Access log" }} />
       </Stack>
     </AuthProvider>
   );
