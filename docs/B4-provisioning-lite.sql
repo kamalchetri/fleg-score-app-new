@@ -32,6 +32,27 @@ begin
       v_tours := v_tours + 1;
     end if;
 
+    -- Venue + date window per sport, from the official NSPG schedule (VENUE & DATES).
+    -- Re-applied each run (idempotent — sets known values).
+    update tournaments t set venue_name = m.venue, starts_at = m.sd, ends_at = m.ed
+    from (values
+      ('archery','Cricket Stadium, Sovima','2026-11-03 09:00+05:30'::timestamptz,'2026-11-06 18:00+05:30'::timestamptz),
+      ('athletics','SAI, Dimapur','2026-11-03 09:00+05:30','2026-11-06 18:00+05:30'),
+      ('badminton','Kire Stadium, NAPTC','2026-11-03 09:00+05:30','2026-11-06 18:00+05:30'),
+      ('basketball','1st NAP Ground','2026-11-03 09:00+05:30','2026-11-07 18:00+05:30'),
+      ('boxing','1st NAP Ground','2026-11-10 09:00+05:30','2026-11-13 18:00+05:30'),
+      ('football','DGP Sports Ground','2026-11-10 09:00+05:30','2026-11-14 18:00+05:30'),
+      ('lawn_tennis','Kuda, Dimapur','2026-11-10 09:00+05:30','2026-11-11 18:00+05:30'),
+      ('pencak_silat','Immanuel Hall, Signal Basti, Dimapur','2026-11-03 09:00+05:30','2026-11-05 18:00+05:30'),
+      ('sepaktakraw','Multi Disciplinary Stadium, Sovima','2026-11-12 09:00+05:30','2026-11-14 18:00+05:30'),
+      ('table_tennis','Multi Disciplinary Stadium, Sovima','2026-11-04 09:00+05:30','2026-11-06 18:00+05:30'),
+      ('taekwondo','Kire Stadium, NAPTC','2026-11-10 09:00+05:30','2026-11-11 18:00+05:30'),
+      ('volleyball','1st NAP Ground','2026-11-10 09:00+05:30','2026-11-13 18:00+05:30'),
+      ('wrestling','Multi Disciplinary Complex, near DC Complex, Chümoukedima','2026-11-04 09:00+05:30','2026-11-05 18:00+05:30'),
+      ('wushu','Multi Disciplinary Complex, near DC Complex, Chümoukedima','2026-11-12 09:00+05:30','2026-11-13 18:00+05:30')
+    ) as m(sport, venue, sd, ed)
+    where t.id = v_tid and m.sport = f.sport;
+
     for c in select id, name from reg_form_categories where form_id = f.id order by sort_order loop
       -- category (map by name); entrant_type by sport
       select id into v_cid from tournament_categories where tournament_id = v_tid and name = c.name;
