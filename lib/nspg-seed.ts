@@ -4,7 +4,7 @@
  * by Supabase read-views; screens never import this file directly.
  */
 import type {
-  NspgSport, Fixture, MatchDetail, Standings, MedalRow,
+  NspgSport, Fixture, MatchDetail, Standings, MedalRow, Medalist,
 } from "./nspg-live";
 
 const side = (id: string, name: string, district: string, score: number | null = null) => ({
@@ -85,4 +85,10 @@ export const SEED_MEDALS: MedalRow[] = [
   { district: "Mokokchung", gold: 5, silver: 3, bronze: 5, total: 13 },
   { district: "Phek", gold: 3, silver: 4, bronze: 2, total: 9 },
   { district: "Wokha", gold: 2, silver: 2, bronze: 3, total: 7 },
+];
+
+export const SEED_MEDALISTS: Medalist[] = [
+  { regId: "TS-3258", name: "Kedarnath Ao", district: "Mokokchung", sport: "Athletics", event: "100m", medal: "gold" },
+  { regId: "FBL-1234", name: "Arenla Jamir", district: "Kohima", sport: "Football", event: "Women's football", medal: "silver" },
+  { regId: "BOX-2041", name: "Vikuo Ritse", district: "Kohima", sport: "Boxing", event: "Men's 67 kg", medal: "bronze" },
 ];

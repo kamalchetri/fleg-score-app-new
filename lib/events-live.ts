@@ -47,13 +47,26 @@ export interface EventDetail extends EventSummary {
 
 /** All public events for Discover, newest/soonest first. Optionally filter by kind. */
 export async function listEvents(kind?: EventKind): Promise<EventSummary[]> {
-  const all = SEED_EVENTS; // → select * from events_v_public order by start_date
+  // The public feed is for current/upcoming discovery. Historical events stay
+  // available by slug for receipts/history but must not occupy the live feed.
+  const all = SEED_EVENTS.filter(isCurrentEvent); // → select * from events_v_public where is_current
   return kind ? all.filter((e) => e.kind === kind) : all;
 }
 
 /** Featured / happening-now events for the Home hero + strips. */
 export async function listFeaturedEvents(): Promise<EventSummary[]> {
-  return SEED_EVENTS.filter((e) => e.status === "live" || e.status === "registration_open").slice(0, 6);
+  return SEED_EVENTS.filter(isCurrentEvent).filter((e) => e.status === "live" || e.status === "registration_open").slice(0, 6);
+}
+
+/** Keep stale seed/live rows out of all public discovery surfaces. */
+export function isCurrentEvent(event: EventSummary): boolean {
+  if (event.status === "past") return false;
+  if (!event.startDate) return true;
+  const start = Date.parse(event.startDate);
+  if (!Number.isFinite(start)) return true;
+  const age = Date.now() - start;
+  if (event.status === "live") return age < 14 * 24 * 60 * 60 * 1000;
+  return age < 24 * 60 * 60 * 1000;
 }
 
 /** One event's full detail for the event screen / register-checkout. */

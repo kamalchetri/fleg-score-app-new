@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from "react-native";
-import { router } from "expo-router";
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors, Palette, Radius, Spacing } from "@/lib/theme";
 import { fetchAppSettings } from "@/lib/app-settings";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 import {
   canChangePick,
   fetchMyPick,
   fetchMyXp,
   fetchTallies,
+  optimisticPickTally,
   upsertPick,
   type PickSide,
   type PickTally,
@@ -25,13 +27,31 @@ export interface PickTarget {
 }
 
 export function PickEntry({ total, onPick }: { total: number; onPick: () => void }) {
+  const { session } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const userId = session?.user.id;
+  const loadAvatar = useCallback(() => {
+    let active = true;
+    if (!userId) {
+      setAvatarUrl(null);
+      return () => { active = false; };
+    }
+    void supabase.from("profiles").select("avatar_url").eq("id", userId).maybeSingle().then(
+      ({ data }) => {
+        if (active) setAvatarUrl(typeof data?.avatar_url === "string" ? data.avatar_url : null);
+      },
+      () => {},
+    );
+    return () => { active = false; };
+  }, [userId]);
+  useFocusEffect(loadAvatar);
   const label = total === 0 ? "Be the first to pick" : `${total} placed a pick`;
   return (
     <View style={styles.entry}>
       <View style={styles.avatars}>
         {[0, 1, 2].map((i) => (
           <View key={i} style={[styles.avatar, { marginLeft: i === 0 ? 0 : -8 }]}>
-            <MaterialCommunityIcons name="account" size={12} color={Colors.textDim} />
+            {i === 0 && avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <MaterialCommunityIcons name="account" size={12} color={Colors.textDim} />}
           </View>
         ))}
       </View>
@@ -65,14 +85,19 @@ export function PickSheet({
   const [xp, setXp] = useState<number | null>(null);
   const [multiplier, setMultiplier] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [tallyUnavailable, setTallyUnavailable] = useState(false);
 
   const load = useCallback(async () => {
     if (!target) return;
     setLoading(true);
     setError(null);
+    setTallyUnavailable(false);
     try {
       const [tallies, settings, mine, totalXp] = await Promise.all([
-        fetchTallies([target.id]),
+        fetchTallies([target.id]).catch((): Record<string, PickTally> => {
+          setTallyUnavailable(true);
+          return {};
+        }),
         fetchAppSettings().catch(() => ({ platform_fee_bps: 500, xp_multiplier: 1, payout_cycle_note: null })),
         userId ? fetchMyPick(target.id, userId) : Promise.resolve(null),
         userId ? fetchMyXp().catch(() => null) : Promise.resolve(null),
@@ -105,12 +130,28 @@ export function PickSheet({
     if (!target || !userId || locked || busy) return;
     setBusy(true);
     setError(null);
+    const beforeTally = tally ?? { match_id: target.id, a_count: 0, b_count: 0, total: 0 };
+    const beforeSide = side;
+    const optimistic = optimisticPickTally(beforeTally, beforeSide, next);
+    setSide(next);
+    setTally(optimistic);
     try {
       await upsertPick(target.id, userId, next);
-      setSide(next);
-      const tallies = await fetchTallies([target.id]);
-      setTally(tallies[target.id] ?? tally);
+      try {
+        const tallies = await fetchTallies([target.id]);
+        const refreshed = tallies[target.id];
+        // A read replica can briefly return the pre-write tally. Do not let
+        // that stale response undo the visible percentage change.
+        if (refreshed && refreshed.total >= optimistic.total && (next === "a" ? refreshed.a_count >= optimistic.a_count : refreshed.b_count >= optimistic.b_count)) {
+          setTally(refreshed);
+        }
+      } catch {
+        setTallyUnavailable(true);
+        setError("Your pick was saved. The community tally is temporarily unavailable.");
+      }
     } catch (e) {
+      setSide(beforeSide);
+      setTally(beforeTally);
       setError(e instanceof Error ? e.message : "Could not save your pick.");
     } finally {
       setBusy(false);
@@ -176,7 +217,7 @@ export function PickSheet({
               <View style={styles.verified}>
                 <MaterialCommunityIcons name="check-decagram" size={14} color={Colors.live} />
                 <Txt variant="bodySm" color={Colors.textDim}>
-                  {total} verified picks
+                  {tallyUnavailable ? "Community tally unavailable" : `${total} verified picks`}
                 </Txt>
               </View>
 
@@ -279,6 +320,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarImage: { borderRadius: 10, height: 20, width: 20 },
   pickBtn: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.pill,

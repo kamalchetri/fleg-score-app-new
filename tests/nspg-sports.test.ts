@@ -10,6 +10,7 @@ import {
   canonicalNspgSlug,
   normalizeSportSlug,
   resolveMatchEngine,
+  resolveCategoryMatchEngine,
   resolveNspgEngine,
   type ScoringArchetype,
 } from "../lib/sports/nspg";
@@ -81,7 +82,7 @@ test("alias normalization keeps canonical underscore slugs", () => {
   expectEq(NSPG_SPORTS.sepaktakraw.slug, "sepaktakraw");
 });
 
-test("only football, basketball, and badminton resolve to live engines", () => {
+test("live engines and structured result sports are explicit", () => {
   expectEq(resolveNspgEngine("football"), "futsal");
   expectEq(resolveNspgEngine("basketball"), "basketball");
   expectEq(resolveNspgEngine("badminton"), "badminton");
@@ -96,6 +97,8 @@ test("only football, basketball, and badminton resolve to live engines", () => {
     "volleyball",
     "sepaktakraw",
     "archery",
+    "pencak_silat",
+    "wushu",
   ]);
   for (const slug of NSPG_SPORT_SLUGS) {
     const sport = NSPG_SPORTS[slug];
@@ -118,8 +121,8 @@ test("only football, basketball, and badminton resolve to live engines", () => {
   expectEq(NSPG_SPORTS.volleyball.structuredResultEntryRequired, true);
   expectEq(NSPG_SPORTS.sepaktakraw.structuredResultEntryRequired, true);
   expectEq(NSPG_SPORTS.archery.structuredResultEntryRequired, true);
-  expectEq(NSPG_SPORTS.wushu.liveScoring, "unsupported");
-  expectEq(NSPG_SPORTS.pencak_silat.liveScoring, "unsupported");
+  expectEq(NSPG_SPORTS.wushu.liveScoring, "structured");
+  expectEq(NSPG_SPORTS.pencak_silat.liveScoring, "structured");
 });
 
 test("unknown sports never resolve to futsal", () => {
@@ -132,6 +135,9 @@ test("unknown sports never resolve to futsal", () => {
   expectEq(resolveMatchEngine("futsal"), "futsal");
   expectEq(resolveMatchEngine("pickleball"), "pickleball");
   expectEq(resolveMatchEngine("darts"), "darts");
+  expectEq(resolveCategoryMatchEngine("pencak_silat", "Men Artistic"), "artistic");
+  expectEq(resolveCategoryMatchEngine("wushu", "Women Taolu"), "artistic");
+  expectEq(resolveCategoryMatchEngine("pencak_silat", "Men Regu"), null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

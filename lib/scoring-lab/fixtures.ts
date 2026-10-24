@@ -480,7 +480,7 @@ export const SCORING_LAB_FIXTURES: ScoringLabFixture[] = [
   {
     id: "artistic",
     label: "Artistic",
-    match: matchShell("artistic", "pencak_silat", "Men Artistic", {}, "Qira", "Ravi"),
+    match: matchShell("artistic", "pencak_silat", "Men Artistic", { judges: 3, score_min: 0, score_max: 10, penalty_max: 5 }, "Qira", "Ravi"),
     events: [],
   },
   {

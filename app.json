@@ -18,7 +18,10 @@
     "android": {
       "package": "in.fleg.score",
       "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -32,11 +35,18 @@
           "photosPermission": "Allow FLEG Score to upload event banners and registration files."
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      "expo-notifications"
     ],
     "experiments": {
       "tsconfigPaths": true,
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d047d73e-179b-45c1-a024-844c62d1ae8f"
+      }
     }
   }
 }

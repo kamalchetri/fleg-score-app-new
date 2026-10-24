@@ -16,6 +16,7 @@ import { computeTableTennisState, parseTableTennisConfig } from "./table-tennis"
 import { computeArcheryState, parseArcheryConfig } from "./archery";
 import { computeSepaktakrawState, parseSepaktakrawConfig } from "./sepaktakraw";
 import { computeVolleyballState, parseVolleyballConfig } from "./volleyball";
+import { computeArtisticState, parseArtisticConfig } from "./artistic";
 import { canonicalNspgSlug } from "@/lib/sports/nspg";
 import type { MatchState, ScoringEvent } from "./types";
 import {
@@ -51,6 +52,9 @@ export type {
   ArcheryCumulativeConfig,
   ArcheryShootOffConfig,
   ArcheryShootOffResult,
+  ArtisticConfig,
+  ArtisticDetail,
+  ArtisticResult,
   RallySetConfig,
   RallySetScoreboard,
   DartsVisit,
@@ -76,6 +80,7 @@ export {
   archeryShootOffCap,
 } from "./archery";
 export { BOUT_RESULT_METHODS, BOUT_NOTE_MAX, ARCHERY_NOTE_MAX } from "./types";
+export { computeArtisticState, parseArtisticConfig, parseArtisticResult, artisticTotal, formatArtisticDisplay } from "./artistic";
 
 function sportKey(sport: string): string {
   return sport.trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -173,6 +178,12 @@ export function computeMatchState(
     const parsed = parseArcheryConfig(sportConfig);
     if (!parsed) throw new Error("Rules not configured");
     return computeArcheryState(parsed, events);
+  }
+
+  if (sportKey(sport) === "artistic") {
+    const parsed = parseArtisticConfig(sportConfig);
+    if (!parsed) throw new Error("Rules not configured");
+    return computeArtisticState(parsed, events);
   }
 
   // Default to futsal semantics for any team sport (football/futsal).

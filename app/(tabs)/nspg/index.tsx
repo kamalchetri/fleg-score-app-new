@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PrimaryButton, Screen, Txt } from "@/components/kit";
 import { PublicMatchCard } from "@/components/nspg/PublicMatchCard";
 import { PublicHeader } from "@/components/nspg/PublicHeader";
+import { NspgBrand } from "@/components/nspg/NspgBrand";
 import { getLiveMatches, listNspgSports, type NspgSport, type Fixture } from "@/lib/nspg-live";
 import { Colors, Radius, Spacing, Type } from "@/lib/theme";
 
@@ -19,6 +20,7 @@ export default function NspgHub() {
         <Txt variant="labelCaps" color={Colors.primary}>NAGALAND STATE & PARA GAMES</Txt>
         <Txt variant="displayHero">NSPG 2026</Txt>
         <View style={styles.hero}>
+          <NspgBrand tone="light" compact />
           <View style={styles.heroTop}>
             <MaterialCommunityIcons name="trophy" size={18} color={Colors.onPrimary} />
             <Txt variant="labelCaps" color={Colors.onPrimary} style={styles.heroCompetition}>
@@ -39,7 +41,10 @@ export default function NspgHub() {
         {live.length > 0 ? <><View style={styles.sectionHead}><Txt variant="headlineSm">Live now</Txt><Txt variant="labelCaps" color={Colors.danger}>● ON AIR</Txt></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.liveRow}>{live.map((m) => <View key={m.id} style={styles.liveCard}><PublicMatchCard fixture={m} onPress={() => router.push(`/(tabs)/live/${m.id}` as never)} /></View>)}</ScrollView></> : null}
         <View style={styles.sectionHead}><Txt variant="headlineSm">Sports</Txt><Txt variant="bodySm" color={Colors.textDim}>2026 programme</Txt></View>
         <View style={styles.grid}>{sports.map((sport) => <SportCard key={sport.slug} sport={sport} />)}</View>
-        <PrimaryButton label="View medal tally" icon="medal-outline" onPress={() => router.push("/(tabs)/nspg/medals" as never)} />
+        <View style={styles.actionStack}>
+          <PrimaryButton label="Athletes & analytics" icon="account-star-outline" onPress={() => router.push("/(tabs)/nspg/athletes" as never)} />
+          <PrimaryButton label="View medal tally" icon="medal-outline" onPress={() => router.push("/(tabs)/nspg/medals" as never)} />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -62,4 +67,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.md },
   sport: { backgroundColor: Colors.surface1, borderColor: Colors.hairline, borderRadius: Radius.xl, borderWidth: 1, gap: Spacing.sm, padding: Spacing.lg, width: "47%" },
   icon: { alignItems: "center", backgroundColor: Colors.surface3, borderRadius: Radius.pill, height: 44, justifyContent: "center", width: 44 },
+  actionStack: { gap: Spacing.sm },
 });

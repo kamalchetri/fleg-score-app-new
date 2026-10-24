@@ -11,6 +11,7 @@ export const SCORING_ARCHETYPES = [
   "Team score and clock",
   "Racket/rally sets",
   "Combat bracket",
+  "Judged performance",
   "Athletics results",
   "Archery ends",
 ] as const;
@@ -63,6 +64,7 @@ const ATHLETICS: ScoringArchetype = "Athletics results";
 const CLOCK: ScoringArchetype = "Team score and clock";
 const RALLY: ScoringArchetype = "Racket/rally sets";
 const COMBAT: ScoringArchetype = "Combat bracket";
+const PERFORMANCE: ScoringArchetype = "Judged performance";
 
 function supported(engine: NspgLiveEngine): Pick<
   NspgSportCapability,
@@ -108,13 +110,13 @@ export const NSPG_SPORTS: Record<NspgSportSlug, NspgSportCapability> = {
   boxing: { slug: "boxing", displayName: "Boxing", archetype: COMBAT, entrantStyle: "individual", ...structured(false) },
   football: { slug: "football", displayName: "Football", archetype: CLOCK, entrantStyle: "team", ...supported("futsal") },
   lawn_tennis: { slug: "lawn_tennis", displayName: "Lawn Tennis", archetype: RALLY, entrantStyle: "mixed", ...structured(true) },
-  pencak_silat: { slug: "pencak_silat", displayName: "Pencak Silat", archetype: COMBAT, entrantStyle: "mixed", ...pending() },
+  pencak_silat: { slug: "pencak_silat", displayName: "Pencak Silat", archetype: PERFORMANCE, entrantStyle: "mixed", ...structured(true) },
   sepaktakraw: { slug: "sepaktakraw", displayName: "Sepaktakraw", archetype: CLOCK, entrantStyle: "team", ...structured(true) },
   table_tennis: { slug: "table_tennis", displayName: "Table Tennis", archetype: RALLY, entrantStyle: "mixed", ...structured(true) },
   taekwondo: { slug: "taekwondo", displayName: "Taekwondo", archetype: COMBAT, entrantStyle: "individual", ...structured(false) },
   volleyball: { slug: "volleyball", displayName: "Volleyball", archetype: CLOCK, entrantStyle: "team", ...structured(true) },
   wrestling: { slug: "wrestling", displayName: "Wrestling", archetype: COMBAT, entrantStyle: "individual", ...structured(false) },
-  wushu: { slug: "wushu", displayName: "Wushu", archetype: COMBAT, entrantStyle: "individual", ...pending() },
+  wushu: { slug: "wushu", displayName: "Wushu", archetype: PERFORMANCE, entrantStyle: "individual", ...structured(true) },
 };
 
 /**
@@ -161,6 +163,7 @@ export type MatchEngine = NspgLiveEngine | "pickleball" | "darts";
 export type CategoryMatchEngine =
   | MatchEngine
   | "combat"
+  | "artistic"
   | "table_tennis"
   | "lawn_tennis"
   | "volleyball"
@@ -253,7 +256,11 @@ export function resolveCategoryMatchEngine(
   if (slug === "archery" && isArcheryHeadToHeadCategory(category)) return "archery";
   if (slug === "boxing" || slug === "taekwondo" || slug === "wrestling") return "combat";
   if (slug === "wushu" && /\bsanda\b/i.test(category)) return "combat";
+  if (slug === "wushu" && /\btaolu\b|\bartistic\b/i.test(category) && !/\bsanda\b/i.test(category)) return "artistic";
   if (slug === "pencak_silat" && /tanding/i.test(category)) return "combat";
+  // Pencak Silat's judged individual routines are commonly labelled
+  // Artistic, Tunggal, or Ganda; Regu is an ensemble and stays unsupported.
+  if (slug === "pencak_silat" && /\b(?:artistic|artistik|tunggal|ganda)\b/i.test(category) && !/\bregu\b/i.test(category)) return "artistic";
   if (slug === "table_tennis" && isTableTennisSinglesCategory(category)) return "table_tennis";
   if (slug === "lawn_tennis" && isLawnTennisSinglesCategory(category)) return "lawn_tennis";
   return null;
@@ -289,6 +296,7 @@ export function resolveCategorySupport(
   }
   const engine = resolveCategoryMatchEngine(sport, categoryName);
   if (engine === "combat") return "structured";
+  if (engine === "artistic") return "structured";
   if (engine) return "supported";
   return "unsupported";
 }

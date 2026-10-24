@@ -1033,53 +1033,93 @@ export interface FeedMatch {
   status: string; // live | scheduled | completed | walkover
   scheduled_at: string | null;
   started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
   round: number;
   score: MatchScore | null;
-  tournament: { id: string; name: string; sport: string; city: string | null } | null;
+  tournament: {
+    id: string;
+    name: string;
+    sport: string;
+    city: string | null;
+    status?: string | null;
+    visibility?: string | null;
+    starts_at?: string | null;
+    ends_at?: string | null;
+  } | null;
   category: { name: string } | null;
   a: { display_name: string } | null;
   b: { display_name: string } | null;
 }
 
 const FEED_SELECT = `id, status, scheduled_at, started_at, round, score,
-  tournament:tournaments!matches_tournament_id_fkey(id, name, sport, city),
+  updated_at, completed_at,
+  tournament:tournaments!matches_tournament_id_fkey(id, name, sport, city, status, visibility, starts_at, ends_at),
   category:tournament_categories!matches_category_id_fkey(name),
   a:entrants!matches_entrant_a_fkey(display_name),
   b:entrants!matches_entrant_b_fkey(display_name)`;
 
+/** Public feed safety boundary. RLS remains authoritative; this prevents an
+ * orphaned/private/draft relation from leaking into a public card if the
+ * match row itself is readable. */
+export function isPublicFeedTournament(
+  tournament: FeedMatch["tournament"],
+): boolean {
+  if (!tournament) return false;
+  if (tournament.visibility != null && !["public", "unlisted"].includes(tournament.visibility)) return false;
+  if (tournament.status != null && ["draft", "archived"].includes(tournament.status)) return false;
+  return true;
+}
+
+export function isScheduledForPublicFeed(match: FeedMatch, now = new Date()): boolean {
+  if (!isPublicFeedTournament(match.tournament) || !match.scheduled_at) return false;
+  return new Date(match.scheduled_at).getTime() >= now.getTime();
+}
+
 /** Currently-live matches across all public tournaments. */
 export async function fetchLiveMatches(): Promise<FeedMatch[]> {
+  // A crashed scorer or an abandoned test match can leave status='live'
+  // forever. The app must not present that stale flag as a current event.
+  const freshnessCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("matches")
     .select(FEED_SELECT)
     .eq("status", "live")
+    .gte("updated_at", freshnessCutoff)
     .order("started_at", { ascending: false, nullsFirst: false });
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as FeedMatch[];
+  return (data ?? []).map((row) => row as unknown as FeedMatch)
+    .filter((match) => isPublicFeedTournament(match.tournament));
 }
 
-/** Upcoming (scheduled) matches, soonest first; undated ones sort last. */
+/** Upcoming (scheduled) matches, soonest first; undated/stale rows stay out of the public feed. */
 export async function fetchUpcomingMatches(limit = 20): Promise<FeedMatch[]> {
+  const now = new Date();
   const { data, error } = await supabase
     .from("matches")
     .select(FEED_SELECT)
     .eq("status", "scheduled")
+    .gte("scheduled_at", now.toISOString())
     .order("scheduled_at", { ascending: true, nullsFirst: false })
     .limit(limit);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as FeedMatch[];
+  return (data ?? []).map((row) => row as unknown as FeedMatch)
+    .filter((match) => isScheduledForPublicFeed(match, now));
 }
 
 /** Most recently finished matches (results feed fallback when nothing is live). */
 export async function fetchRecentResults(limit = 10): Promise<FeedMatch[]> {
+  const recentCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("matches")
     .select(FEED_SELECT)
     .in("status", ["completed", "walkover"])
+    .gte("completed_at", recentCutoff)
     .order("completed_at", { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as FeedMatch[];
+  return (data ?? []).map((row) => row as unknown as FeedMatch)
+    .filter((match) => isPublicFeedTournament(match.tournament));
 }
 
 export interface PublicTournament {

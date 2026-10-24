@@ -1,13 +1,23 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
-import { isOrganiserRole, normalizeRole } from "@/lib/role-utils";
+import { canScanAccreditation, canViewAccessLog, isOrganiserRole, normalizeRole } from "@/lib/role-utils";
 
-export type AppRole = "admin" | "nspg_lead" | "nspg_staff" | "organiser" | "organizer" | "user";
+export type AppRole = "admin" | "nspg_lead" | "nspg_staff" | "organiser" | "organizer" | "volunteer" | "kiosk_volunteer" | "official" | "referee" | "user";
 
 export { isOrganiserRole, normalizeRole } from "@/lib/role-utils";
 
-export function useRole(): { role: AppRole; loading: boolean; canOrganise: boolean; canManageNspg: boolean } {
+const SUPER_ADMIN_EMAIL = "alltoolsatwork@gmail.com";
+
+export function useRole(): {
+  role: AppRole;
+  loading: boolean;
+  canOrganise: boolean;
+  canManageNspg: boolean;
+  canScanAccreditation: boolean;
+  canViewAccessLog: boolean;
+  isSuperAdmin: boolean;
+} {
   const { session, loading: authLoading } = useAuth();
   const [role, setRole] = useState<AppRole>("user");
   const [loading, setLoading] = useState(true);
@@ -44,5 +54,11 @@ export function useRole(): { role: AppRole; loading: boolean; canOrganise: boole
     loading: authLoading || loading,
     canOrganise: role === "admin" || isOrganiserRole(role),
     canManageNspg: role === "admin" || role === "nspg_lead" || role === "nspg_staff" || isOrganiserRole(role),
+    canScanAccreditation: canScanAccreditation(role),
+    canViewAccessLog: canViewAccessLog(role),
+    // UI capability only: server-side role checks remain authoritative.
+    isSuperAdmin: role === "admin" && session?.user.email?.toLowerCase() === SUPER_ADMIN_EMAIL,
   };
 }
+
+export { SUPER_ADMIN_EMAIL };

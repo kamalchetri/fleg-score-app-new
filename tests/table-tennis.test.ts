@@ -212,14 +212,14 @@ test("existing engines and combat routing stay unchanged", () => {
   expectEq(resolveCategoryMatchEngine("taekwondo", null), "combat");
   expectEq(resolveCategoryMatchEngine("wrestling", "Freestyle"), "combat");
   expectEq(resolveCategoryMatchEngine("wushu", "Men's Sanda"), "combat");
-  expectEq(resolveCategoryMatchEngine("wushu", "Taolu"), null);
+  expectEq(resolveCategoryMatchEngine("wushu", "Taolu"), "artistic");
   expectEq(resolveCategoryMatchEngine("pencak_silat", "Tanding"), "combat");
-  expectEq(resolveCategoryMatchEngine("pencak_silat", "Tunggal"), null);
+  expectEq(resolveCategoryMatchEngine("pencak_silat", "Tunggal"), "artistic");
   expectEq(resolveCategorySupport("boxing", "Flyweight"), "structured");
   expectEq(resolveCategorySupport("wushu", "Sanda"), "structured");
-  expectEq(resolveCategorySupport("wushu", "Taolu"), "unsupported");
+  expectEq(resolveCategorySupport("wushu", "Taolu"), "structured");
   expectEq(resolveCategorySupport("pencak_silat", "Putra Tanding"), "structured");
-  expectEq(resolveCategorySupport("pencak_silat", "Artistic"), "unsupported");
+  expectEq(resolveCategorySupport("pencak_silat", "Artistic"), "structured");
   expectEq(resolveCategorySupport("athletics", "100m"), "unsupported");
   expectEq(resolveCategorySupport("archery", "Ranking Round"), "unsupported");
   expectEq(resolveCategorySupport("volleyball", "Men"), "structured");

@@ -6,11 +6,13 @@ import {
   computeTableTennisState,
   computeSepaktakrawState,
   computeVolleyballState,
+  computeArtisticState,
   parseArcheryConfig,
   parseLawnTennisConfig,
   parseSepaktakrawConfig,
   parseTableTennisConfig,
   parseVolleyballConfig,
+  parseArtisticConfig,
   resolveStageContext,
   type MatchState,
   type ScoringEvent,
@@ -52,6 +54,11 @@ export function projectMatchState(match: ScoringMatch, events: ScoringEvent[]): 
     match.tournament.sport_config,
   );
   if (engine === "combat") return computeCombatState(events);
+  if (engine === "artistic") {
+    const rules = parseArtisticConfig(sportConfig);
+    if (!rules) return null;
+    return computeArtisticState(rules, events);
+  }
   if (engine === "table_tennis") {
     const rules = parseTableTennisConfig(sportConfig);
     if (!rules) return null;

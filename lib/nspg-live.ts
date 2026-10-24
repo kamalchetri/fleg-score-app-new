@@ -11,7 +11,7 @@
  *   nspg_v_sports, nspg_v_fixtures, nspg_v_live, nspg_v_match, nspg_v_standings, nspg_v_medals
  */
 import {
-  SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS, SEED_MEDALS,
+  SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS, SEED_MEDALS, SEED_MEDALISTS,
 } from "./nspg-seed";
 
 export type MatchStatus = "scheduled" | "live" | "final";
@@ -89,6 +89,15 @@ export interface MedalRow {
   total: number;
 }
 
+export interface Medalist {
+  regId: string;
+  name: string;
+  district: string;
+  sport: string;
+  event: string;
+  medal: "gold" | "silver" | "bronze";
+}
+
 // ─── Public hub API (Task B reads only these) ──────────────────────────────
 
 /** All NSPG sports with live/today counts, for the hub grid. */
@@ -122,6 +131,11 @@ export async function getStandings(sportSlug: string, category?: string): Promis
 /** District medal/points tally for the hub's medal view. */
 export async function getMedalTally(): Promise<MedalRow[]> {
   return SEED_MEDALS; // → select * from nspg_v_medals order by gold desc, silver desc, bronze desc
+}
+
+/** Published individual medal results for the public athlete directory. */
+export async function getMedalists(): Promise<Medalist[]> {
+  return SEED_MEDALISTS; // → select * from nspg_v_medalists order by published_at desc
 }
 
 /**

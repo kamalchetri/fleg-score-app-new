@@ -12,11 +12,12 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useSegments } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors, Font, Palette, Radius, Spacing, Type, type TypeVariant } from "@/lib/theme";
+import { NspgWatermark } from "@/components/nspg/NspgWatermark";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -47,8 +48,17 @@ export function Txt({
 }
 
 /* ── Screen wrapper ─────────────────────────────────────────────────────── */
-export function Screen({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <SafeAreaView style={[styles.screen, style]}>{children}</SafeAreaView>;
+export function Screen({ children, style, watermark = false }: { children: ReactNode; style?: StyleProp<ViewStyle>; watermark?: boolean }) {
+  const segments = useSegments() as readonly string[];
+  const isNspgRoute =
+    segments.includes("nspg") ||
+    segments.includes("organiser") ||
+    segments.includes("kiosk") ||
+    segments.includes("accreditation") ||
+    segments.includes("access-log") ||
+    segments.includes("athlete") ||
+    (segments.includes("(tabs)") && segments.includes("live"));
+  return <SafeAreaView style={[styles.screen, style]}>{watermark || isNspgRoute ? <NspgWatermark /> : null}{children}</SafeAreaView>;
 }
 
 /* ── Icon button (circular) ─────────────────────────────────────────────── */
@@ -427,6 +437,7 @@ const NAV_PATH: Record<NavTab, "/home" | "/events" | "/games" | "/profile"> = {
 
 export function BottomNav({ active, onNavigate }: { active: NavTab; onNavigate?: (t: NavTab) => void }) {
   const segments = useSegments() as readonly string[];
+  const insets = useSafeAreaInsets();
   if (segments[0] === "(tabs)") return null;
   function go(t: NavTab) {
     if (onNavigate) return onNavigate(t);
@@ -435,7 +446,7 @@ export function BottomNav({ active, onNavigate }: { active: NavTab; onNavigate?:
     router.replace(NAV_PATH[t]);
   }
   return (
-    <View style={styles.bottomNav}>
+    <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {NAV.map((t) => {
         const on = t.key === active;
         return (
@@ -503,7 +514,7 @@ const styles = StyleSheet.create({
   heroTeam: { flex: 1, alignItems: "center", gap: 8 },
   heroClock: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, paddingHorizontal: 10, paddingVertical: 3, borderRadius: Radius.pill, backgroundColor: "rgba(11,12,16,0.10)" },
   fxTeam: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
-  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 20 },
+  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.primary, borderColor: "rgba(255,255,255,0.22)", borderRadius: Radius.pill, borderWidth: 1, elevation: 3, minHeight: 50, paddingVertical: 14, paddingHorizontal: 20, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 7 },
   bottomNav: {
     position: "absolute",
     bottom: 0,

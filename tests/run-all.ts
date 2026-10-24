@@ -10,6 +10,8 @@ const { resolve } = require("path") as { resolve: (...parts: string[]) => string
 
 const suites = [
   "archery.test.ts",
+  "artistic.test.ts",
+  "athlete-live.test.ts",
   "build-flags.test.ts",
   "combat-bout.test.ts",
   "darts.test.ts",
@@ -19,13 +21,18 @@ const suites = [
   "lawn-tennis.test.ts",
   "nspg-provision.test.ts",
   "nspg-sports.test.ts",
+  "organiser-publish.test.ts",
+  "organiser-persistence.test.ts",
+  "organiser-harness.test.ts",
   "ranked-results.test.ts",
+  "role-capabilities.test.ts",
   "rules-presets.test.ts",
   "scoring-engine.test.ts",
   "scoring-lab.test.ts",
   "sepaktakraw.test.ts",
   "table-tennis.test.ts",
   "volleyball.test.ts",
+  "xp.test.ts",
 ];
 
 const tsxCli = resolve("node_modules", "tsx", "dist", "cli.mjs");

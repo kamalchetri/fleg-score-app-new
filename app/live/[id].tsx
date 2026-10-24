@@ -11,6 +11,7 @@ import {
   computeSepaktakrawState,
   computeTableTennisState,
   computeVolleyballState,
+  computeArtisticState,
   formatCombatDisplay,
   formatLawnTennisSet,
   parseArcheryConfig,
@@ -19,6 +20,7 @@ import {
   parseSepaktakrawConfig,
   parseTableTennisConfig,
   parseVolleyballConfig,
+  parseArtisticConfig,
   sepaktakrawHasSquads,
   resolveStageContext,
   type ArcheryDetail,
@@ -28,6 +30,7 @@ import {
   type SepaktakrawDetail,
   type VolleyballDetail,
   type TableTennisDetail,
+  type ArtisticDetail,
 } from "@/lib/scoring";
 import { fetchEvents, fetchMatch, type MatchDetail } from "@/lib/queries";
 import { readMatchScoreSnapshot, resolveCategoryMatchEngine } from "@/lib/sports/nspg";
@@ -87,6 +90,11 @@ export default function LiveScoreboard() {
         match.tournament.sport_config,
       );
       if (engine === "combat") return computeCombatState(events);
+      if (engine === "artistic") {
+        const rules = parseArtisticConfig(sportConfig);
+        if (!rules) return null;
+        return computeArtisticState(rules, events);
+      }
       if (engine === "archery") {
         const rules = parseArcheryConfig(sportConfig);
         if (!rules) return null;
@@ -774,6 +782,22 @@ export default function LiveScoreboard() {
 
   const isLive = match.status === "live";
   const combat = state.detail.sport === "combat" ? (state.detail as CombatDetail) : null;
+  const artistic = state.detail.sport === "artistic" ? (state.detail as ArtisticDetail) : null;
+  if (artistic) {
+    const scoreA = artistic.result ? artistic.result.scoresA.reduce((sum, value) => sum + value, 0) - artistic.result.deductionA : null;
+    const scoreB = artistic.result ? artistic.result.scoresB.reduce((sum, value) => sum + value, 0) - artistic.result.deductionB : null;
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: match.tournament?.name ?? "Live" }} />
+        <View style={styles.wrap}>
+          <View style={styles.metaRow}>{isLive ? <LiveDot /> : null}<Txt variant="labelCaps" color={isLive ? Colors.primary : Colors.textDim} numberOfLines={1}>{[match.tournament?.name, match.category?.name].filter(Boolean).join(" · ").toUpperCase()}</Txt></View>
+          <View style={styles.board}><View style={styles.side}><Crest name={match.a?.display_name ?? "TBD"} size={64} /><Txt variant="headlineSm" align="center" numberOfLines={2}>{match.a?.display_name ?? "TBD"}</Txt></View><View style={styles.scoreMid}><Txt variant="scoreHuge" color={isLive ? Colors.primary : Colors.text}>{scoreA === null ? "—" : scoreA}</Txt><Txt variant="scoreHuge" color={Colors.textFaint}>:</Txt><Txt variant="scoreHuge" color={isLive ? Colors.primary : Colors.text}>{scoreB === null ? "—" : scoreB}</Txt></View><View style={styles.side}><Crest name={match.b?.display_name ?? "TBD"} size={64} /><Txt variant="headlineSm" align="center" numberOfLines={2}>{match.b?.display_name ?? "TBD"}</Txt></View></View>
+          <View style={styles.statusRow}><StatusPill status={match.status} />{artistic.result ? <Txt variant="bodyMd" color={Colors.textDim}>{artistic.result.winnerSide === "a" ? match.a?.display_name : match.b?.display_name} · judged result</Txt> : <Txt variant="bodyMd" color={Colors.textDim}>Awaiting judges</Txt>}</View>
+        </View>
+        <PickSheet target={pickOpen ? ({ id: match.id, home: match.a?.display_name ?? "TBD", away: match.b?.display_name ?? "TBD", status: match.status, startedAt: match.started_at } satisfies PickTarget) : null} onClose={() => setPickOpen(false)} />
+      </Screen>
+    );
+  }
   if (combat) {
     const showsPoints = combat.result !== null && combat.result.pointsA !== null && combat.result.pointsB !== null;
     const line = formatCombatDisplay(combat.result);

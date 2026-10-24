@@ -9,7 +9,10 @@ WebBrowser.maybeCompleteAuthSession();
 export const GOOGLE_OAUTH_REDIRECT_PATH = "auth-callback";
 
 export function googleOAuthRedirectUri(): string {
-  return Linking.createURL(GOOGLE_OAUTH_REDIRECT_PATH);
+  // Force the installed app scheme. Without this, a Metro/dev build can
+  // generate an exp:// callback and the browser may finish on fleg.in instead
+  // of handing the OAuth result back to in.fleg.score.
+  return Linking.createURL(GOOGLE_OAUTH_REDIRECT_PATH, { scheme: "flegscore" });
 }
 
 interface OAuthCallbackParams {

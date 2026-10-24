@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { asRows, rpc, rpcIdList, table, type QueryResult } from "@/lib/supabase-extra";
+import { optimisticPickTally } from "@/lib/pick-math";
+export { optimisticPickTally } from "@/lib/pick-math";
 
 export type PickSide = "a" | "b";
 
@@ -16,6 +18,7 @@ export interface MyPick {
   is_correct: boolean | null;
   xp_awarded: number | null;
 }
+
 
 export function canChangePick(match: {
   status: string;

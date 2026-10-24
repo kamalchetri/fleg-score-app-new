@@ -12,9 +12,14 @@ import {
   lawnTennisPointLine,
   parseArcheryConfig,
   parseArcheryScoreInput,
+  parseArtisticConfig,
+  artisticTotal,
+  formatArtisticDisplay,
   sepaktakrawHasSquads,
   type ArcheryConfig,
   type ArcheryDetail,
+  type ArtisticDetail,
+  type ArtisticConfig,
   type BoutMethod,
   type ScoringEvent,
 } from "@/lib/scoring";
@@ -85,7 +90,8 @@ export function MatchScoringView({
       engine === "lawn_tennis" ||
       engine === "volleyball" ||
       engine === "sepaktakraw" ||
-      engine === "archery") &&
+      engine === "archery" ||
+      engine === "artistic") &&
     state?.detail.sport !== engine
   ) {
     return (
@@ -159,6 +165,8 @@ export function MatchScoringView({
         ),
       )
     : null;
+  const artisticD = state.detail.sport === "artistic" ? (state.detail as ArtisticDetail) : null;
+  const artisticRules = artisticD ? parseArtisticConfig(effectiveSportConfig(match.tournament?.sport ?? "", match.category?.name, match.tournament?.sport_config)) : null;
   const headlineA = dartD ? dartD.remaining.a : state.scoreSummary.a;
   const headlineB = dartD ? dartD.remaining.b : state.scoreSummary.b;
   const combatPoints = combatD?.result && combatD.result.pointsA !== null && combatD.result.pointsB !== null;
@@ -172,6 +180,8 @@ export function MatchScoringView({
       : lawnTennisPointLine(lawnD)
     : combatD
       ? formatCombatDisplay(combatD.result)
+      : artisticD
+        ? formatArtisticDisplay(artisticD.result)
       : `${headlineA} – ${headlineB}`;
 
   return (
@@ -213,7 +223,8 @@ export function MatchScoringView({
         {archeryD ? (
           <ArcherySummary detail={archeryD} aName={aName} bName={bName} winnerSide={state.winnerSide} />
         ) : null}
-        {!combatD && !tableTennisD && !lawnD && !rallyD && !archeryD ? (
+        {artisticD ? <ArtisticSummary detail={artisticD} aName={aName} bName={bName} /> : null}
+        {!combatD && !artisticD && !tableTennisD && !lawnD && !rallyD && !archeryD ? (
           <Text style={styles.display}>{state.display}</Text>
         ) : null}
         {engine === "futsal" ? <FutsalSubline detail={state.detail as FutsalDetail} now={now} /> : null}
@@ -231,6 +242,8 @@ export function MatchScoringView({
         <>
           {engine === "combat" && combatD ? (
             <CombatControls busy={busy} isComplete={state.isComplete} aName={aName} bName={bName} tap={onEvent} />
+          ) : engine === "artistic" && artisticD && artisticRules ? (
+            <ArtisticControls config={artisticRules} busy={busy} isComplete={state.isComplete} aName={aName} bName={bName} tap={onEvent} />
           ) : engine === "futsal" ? (
             <FutsalControls detail={state.detail as FutsalDetail} busy={busy} aName={aName} bName={bName} tap={onEvent} />
           ) : engine === "basketball" ? (
@@ -917,6 +930,85 @@ function ArcheryScoreField({
       />
     </View>
   );
+}
+
+function ArtisticSummary({ detail, aName, bName }: { detail: ArtisticDetail; aName: string; bName: string }) {
+  if (!detail.result) return <Text style={styles.subline}>Awaiting {detail.judges} judge scores</Text>;
+  const totalA = artisticTotal(detail.result.scoresA, detail.result.deductionA);
+  const totalB = artisticTotal(detail.result.scoresB, detail.result.deductionB);
+  const winner = detail.result.winnerSide === "a" ? aName : bName;
+  return (
+    <>
+      <Text style={styles.subline}>Judges {detail.judges} · {aName} {totalA} · {bName} {totalB}</Text>
+      <Text style={styles.subline}>Winner {winner}</Text>
+      {detail.result.note ? <Text style={styles.subline}>{detail.result.note}</Text> : null}
+    </>
+  );
+}
+
+function ArtisticControls({
+  config,
+  busy,
+  isComplete,
+  aName,
+  bName,
+  tap,
+}: {
+  config: ArtisticConfig;
+  busy: boolean;
+  isComplete: boolean;
+  aName: string;
+  bName: string;
+  tap: (eventType: string, payload: Record<string, unknown>) => void;
+}) {
+  const [scoresA, setScoresA] = useState("");
+  const [scoresB, setScoresB] = useState("");
+  const [deductionA, setDeductionA] = useState("");
+  const [deductionB, setDeductionB] = useState("");
+  const [winner, setWinner] = useState<"a" | "b" | null>(null);
+  const [note, setNote] = useState("");
+  const [reviewing, setReviewing] = useState(false);
+  if (isComplete) return null;
+
+  function parseScoreText(value: string): number[] | null {
+    const values = value.split(",").map((part) => Number(part.trim()));
+    if (values.length !== config.judges || values.some((score) => !Number.isFinite(score) || score < config.score_min || score > config.score_max)) return null;
+    return values;
+  }
+  function parseDeductionText(value: string): number {
+    if (!value.trim()) return 0;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 && parsed <= config.penalty_max ? parsed : Number.NaN;
+  }
+  function review() {
+    if (busy || !winner) return;
+    const parsedA = parseScoreText(scoresA);
+    const parsedB = parseScoreText(scoresB);
+    const penaltyA = parseDeductionText(deductionA);
+    const penaltyB = parseDeductionText(deductionB);
+    if (!parsedA || !parsedB || !Number.isFinite(penaltyA) || !Number.isFinite(penaltyB)) {
+      Alert.alert("Check judge scores", `Enter ${config.judges} scores per side between ${config.score_min} and ${config.score_max}.`);
+      return;
+    }
+    setReviewing(true);
+  }
+  function record() {
+    const parsedA = parseScoreText(scoresA);
+    const parsedB = parseScoreText(scoresB);
+    const penaltyA = parseDeductionText(deductionA);
+    const penaltyB = parseDeductionText(deductionB);
+    if (busy || !winner || !parsedA || !parsedB || !Number.isFinite(penaltyA) || !Number.isFinite(penaltyB)) return;
+    setReviewing(false);
+    tap("artistic_result", { scoresA: parsedA, scoresB: parsedB, deductionA: penaltyA, deductionB: penaltyB, winnerSide: winner, note: note.trim() || undefined });
+  }
+  if (reviewing) {
+    const parsedA = parseScoreText(scoresA)!;
+    const parsedB = parseScoreText(scoresB)!;
+    const penaltyA = parseDeductionText(deductionA);
+    const penaltyB = parseDeductionText(deductionB);
+    return <View><Text style={styles.fieldLabel}>Review judged result</Text><Text style={styles.reviewLine}>{aName}: {artisticTotal(parsedA, penaltyA)} · {bName}: {artisticTotal(parsedB, penaltyB)}</Text><Text style={styles.reviewLine}>Winner: {winner === "a" ? aName : bName}</Text><Text style={styles.reviewLine}>{note.trim() || "No note"}</Text><Button label="Record judged result" disabled={busy} loading={busy} onPress={record} /><Button label="Edit scores" variant="ghost" disabled={busy} onPress={() => setReviewing(false)} /></View>;
+  }
+  return <View><Text style={styles.fieldLabel}>Judge scores · {config.judges} judges</Text><TextInput value={scoresA} onChangeText={setScoresA} editable={!busy} keyboardType="decimal-pad" placeholder={`${aName}: 8, 8, 8`} placeholderTextColor={Colors.textFaint} style={styles.noteInput} accessibilityLabel={`${aName} judge scores`} /><TextInput value={scoresB} onChangeText={setScoresB} editable={!busy} keyboardType="decimal-pad" placeholder={`${bName}: 8, 8, 8`} placeholderTextColor={Colors.textFaint} style={styles.noteInput} accessibilityLabel={`${bName} judge scores`} /><View style={styles.padRow}><ScorePad label="WIN" sublabel={aName} disabled={busy} color={winner === "a" ? Colors.green : Colors.border} onPress={() => setWinner("a")} /><ScorePad label="WIN" sublabel={bName} disabled={busy} color={winner === "b" ? Colors.green : Colors.border} onPress={() => setWinner("b")} /></View><Text style={styles.fieldLabel}>Deductions (optional)</Text><View style={styles.padRow}><TextInput value={deductionA} onChangeText={setDeductionA} editable={!busy} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={Colors.textFaint} style={styles.pointInput} accessibilityLabel={`${aName} deduction`} /><TextInput value={deductionB} onChangeText={setDeductionB} editable={!busy} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={Colors.textFaint} style={styles.pointInput} accessibilityLabel={`${bName} deduction`} /></View><TextInput value={note} onChangeText={setNote} editable={!busy} maxLength={160} placeholder="Judge note (optional)" placeholderTextColor={Colors.textFaint} style={styles.noteInput} accessibilityLabel="Judged result note" /><Button label="Review judged result" disabled={busy || !winner} onPress={review} /></View>;
 }
 
 function CombatControls({

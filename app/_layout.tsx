@@ -16,7 +16,7 @@ import { Colors, Font } from "@/lib/theme";
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
@@ -25,10 +25,10 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) return null;
+    // Do not gate the whole application on font loading. A slow/offline
+    // development device should still render the app with system fallbacks.
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   return (
     <AuthProvider>

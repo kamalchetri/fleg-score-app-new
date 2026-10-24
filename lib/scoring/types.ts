@@ -25,6 +25,7 @@ export interface MatchState {
     | BadmintonDetail
     | DartsDetail
     | CombatDetail
+    | ArtisticDetail
     | TableTennisDetail
     | LawnTennisDetail
     | VolleyballDetail
@@ -326,6 +327,30 @@ export interface BoutResult {
 export interface CombatDetail {
   sport: "combat";
   result: BoutResult | null;
+}
+
+export interface ArtisticConfig {
+  judges: number;
+  score_min: number;
+  score_max: number;
+  penalty_max: number;
+}
+
+export interface ArtisticResult {
+  scoresA: number[];
+  scoresB: number[];
+  deductionA: number;
+  deductionB: number;
+  winnerSide: Side;
+  note: string | null;
+}
+
+export interface ArtisticDetail {
+  sport: "artistic";
+  result: ArtisticResult | null;
+  judges: number;
+  scoreMin: number;
+  scoreMax: number;
 }
 
 /** Optional bout note. Longer text is rejected by the parser. */

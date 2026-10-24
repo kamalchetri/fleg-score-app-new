@@ -123,9 +123,12 @@ test("every lab fixture projects without a network", () => {
         state?.detail.sport === "sepaktakraw" && state.detail.pointsTo === 21 && state.detail.cap === 25,
         "regu preset",
       );
-    } else if (fixture.id === "archery-ranking" || fixture.id === "artistic" || fixture.id === "ranked") {
+    } else if (fixture.id === "archery-ranking" || fixture.id === "ranked") {
       expect(engine === null, `${fixture.id} should stay unsupported`);
       expect(state === null, `${fixture.id} should not score`);
+    } else if (fixture.id === "artistic") {
+      expect(engine === "artistic", "artistic Pencak uses the judged-result engine");
+      expect(state?.detail.sport === "artistic" && state.detail.judges === 3, "artistic rules are explicit");
     } else {
       expect(state !== null, `${fixture.id} should project`);
     }

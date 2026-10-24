@@ -105,11 +105,12 @@ test("pencak tanding and wushu sanda use combat", () => {
   expectEq(resolveCategoryMatchEngine("Wushu", "Sanda"), "combat");
 });
 
-test("artistic ranked and unknown categories stay unsupported", () => {
+test("artistic ensembles and unknown categories stay unsupported", () => {
   expectEq(resolveCategoryMatchEngine("pencak_silat", "Men Artistic Regu"), null);
-  expectEq(resolveCategoryMatchEngine("pencak_silat", "Tunggal"), null);
-  expectEq(resolveCategoryMatchEngine("pencak_silat", "Ganda"), null);
-  expectEq(resolveCategoryMatchEngine("wushu", "Taolu"), null);
+  expectEq(resolveCategoryMatchEngine("pencak_silat", "Men Artistic"), "artistic");
+  expectEq(resolveCategoryMatchEngine("pencak_silat", "Tunggal"), "artistic");
+  expectEq(resolveCategoryMatchEngine("pencak_silat", "Ganda"), "artistic");
+  expectEq(resolveCategoryMatchEngine("wushu", "Taolu"), "artistic");
   expectEq(resolveCategoryMatchEngine("wushu", "Nanquan"), null);
   expectEq(resolveCategoryMatchEngine("wushu", ""), null);
   expectEq(resolveCategoryMatchEngine("athletics", "100m"), null);
