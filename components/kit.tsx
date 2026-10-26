@@ -463,7 +463,7 @@ export function BottomNav({ active, onNavigate }: { active: NavTab; onNavigate?:
     if (onNavigate) return onNavigate(t);
     if (t === active) return;
     // replace (not push) so the tabs don't stack in history.
-    router.replace(NAV_PATH[t]);
+    router.replace(NAV_PATH[t] as never);
   }
   return (
     <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 8) }]}>
