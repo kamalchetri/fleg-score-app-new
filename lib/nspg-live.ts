@@ -10,10 +10,8 @@
  * Backing Supabase read views (created by Claude at B2, public/anon SELECT only):
  *   nspg_v_sports, nspg_v_fixtures, nspg_v_live, nspg_v_match, nspg_v_standings, nspg_v_medals
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
 import {
-  SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS, SEED_MEDALS, SEED_MEDALISTS,
+  SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS, SEED_MEDALS, SEED_MEDALISTS,
 } from "./nspg-seed";
 
 export type MatchStatus = "scheduled" | "live" | "final";
@@ -103,44 +101,8 @@ export interface Medalist {
 // ─── Public hub API (Task B reads only these) ──────────────────────────────
 
 /** All NSPG sports with live/today counts, for the hub grid. */
-const SPORT_ICON: Record<string, string> = {
-  archery: "target", athletics: "run", badminton: "badminton",
-  basketball: "basketball", boxing: "boxing-glove", football: "football",
-  lawn_tennis: "tennis", para: "wheelchair-accessibility",
-  pencak_silat: "karate", sepaktakraw: "volleyball",
-  table_tennis: "table-tennis", taekwondo: "karate",
-  volleyball: "volleyball", wrestling: "kabaddi", wushu: "karate",
-};
-
-const SPORT_LABEL: Record<string, string> = {
-  lawn_tennis: "Lawn Tennis", para: "Para Athletes",
-  pencak_silat: "Pencak Silat", sepaktakraw: "Sepaktakraw",
-  table_tennis: "Table Tennis",
-};
-
-/** NSPG disciplines come from live registration forms, not the six-item demo seed.
- * A closed registration form remains a valid programme discipline. Officials are
- * registration roles rather than a sporting discipline, so they are excluded.
- * Uses the existing anonymous Supabase client and database RLS.
- */
 export async function listNspgSports(): Promise<NspgSport[]> {
-  // The checked-in generated Database type predates the reg_forms table.
-  const client = supabase as unknown as SupabaseClient;
-  const { data, error } = await client
-    .from("reg_forms")
-    .select("sport,slug,title")
-    .like("slug", "nspg26-%")
-    .neq("sport", "officials")
-    .order("sport");
-  if (error) throw error;
-  const sports = new Map<string, NspgSport>();
-  for (const row of data ?? []) {
-    const slug = typeof row.sport === "string" ? row.sport.trim() : "";
-    if (!slug || sports.has(slug)) continue;
-    const name = SPORT_LABEL[slug] ?? slug.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-    sports.set(slug, { slug, name, icon: SPORT_ICON[slug] ?? "trophy-outline", liveCount: 0, todayCount: 0 });
-  }
-  return [...sports.values()];
+  return SEED_SPORTS; // → select * from nspg_v_sports
 }
 
 /** Fixtures + schedule for one sport (all statuses), newest/soonest first. */
