@@ -1,4 +1,6 @@
-import { Tabs } from "expo-router";
+import { Tabs, router, usePathname } from "expo-router";
+import { useEffect } from "react";
+import { Alert, BackHandler, Platform } from "react-native";
 import type { ColorValue } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +13,24 @@ const tabIcon = (name: keyof typeof MaterialCommunityIcons.glyphMap) =>
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const rootTabs = ["/home", "/discover", "/live", "/profile", "/(tabs)/home", "/(tabs)/discover", "/(tabs)/live", "/(tabs)/profile"];
+    if (!rootTabs.includes(pathname)) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (pathname !== "/home" && pathname !== "/(tabs)/home") {
+        router.replace("/(tabs)/home" as never);
+      } else {
+        Alert.alert("Exit FLEG Score?", "Do you want to close the app?", [
+          { text: "Stay", style: "cancel" },
+          { text: "Exit", onPress: () => BackHandler.exitApp() },
+        ]);
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [pathname]);
   const bottomInset = Math.max(insets.bottom, 8);
   return (
     <Tabs
