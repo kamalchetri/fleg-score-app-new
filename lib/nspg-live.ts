@@ -10,6 +10,7 @@
  * Backing Supabase read views (created by Claude at B2, public/anon SELECT only):
  *   nspg_v_sports, nspg_v_fixtures, nspg_v_live, nspg_v_match, nspg_v_standings, nspg_v_medals
  */
+import { NSPG_SPORT_SLUGS, NSPG_SPORTS } from "./sports/nspg";
 import {
   SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS, SEED_MEDALS, SEED_MEDALISTS,
 } from "./nspg-seed";
@@ -102,8 +103,31 @@ export interface Medalist {
 
 /** All NSPG sports with live/today counts, for the hub grid. */
 export async function listNspgSports(): Promise<NspgSport[]> {
-  return SEED_SPORTS; // → select * from nspg_v_sports
+  // Include every discipline from the canonical registry, even when no demo
+  // fixtures exist yet. A missing fixture must never hide a discipline.
+  const seedBySlug = new Map(SEED_SPORTS.map((sport) => [sport.slug, sport]));
+  const icons: Record<string, string> = {
+    archery: "target", athletics: "run", badminton: "badminton",
+    basketball: "basketball", boxing: "boxing-glove", football: "football",
+    lawn_tennis: "tennis", pencak_silat: "karate", sepaktakraw: "volleyball",
+    table_tennis: "table-tennis", taekwondo: "karate", volleyball: "volleyball",
+    wrestling: "kabaddi", wushu: "karate",
+  };
+  return NSPG_SPORT_SLUGS.map((slug) => ({
+    slug,
+    name: NSPG_SPORTS[slug].displayName,
+    icon: seedBySlug.get(slug)?.icon ?? icons[slug] ?? "trophy-outline",
+    liveCount: seedBySlug.get(slug)?.liveCount ?? 0,
+    todayCount: seedBySlug.get(slug)?.todayCount ?? 0,
+  }));
 }
+
+/** Official Nagaland districts for programme navigation (not registration counts). */
+export const NSPG_DISTRICTS = [
+  "Kohima", "Dimapur", "Mokokchung", "Tuensang", "Mon", "Zunheboto",
+  "Wokha", "Phek", "Kiphire", "Longleng", "Peren", "Chümoukedima",
+  "Niuland", "Tseminyü", "Shamator", "Noklak", "Meluri",
+] as const;
 
 /** Fixtures + schedule for one sport (all statuses), newest/soonest first. */
 export async function getSportFixtures(sportSlug: string): Promise<Fixture[]> {
