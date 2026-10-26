@@ -2,6 +2,9 @@
 // Reusable, typed building blocks that map 1:1 to the Stitch design system.
 import { type ReactNode, useEffect, useRef } from "react";
 import {
+  Alert,
+  BackHandler,
+  Platform,
   Animated,
   Pressable,
   StyleSheet,
@@ -421,23 +424,40 @@ export function Input({
 }
 
 /* ── Bottom navigation ──────────────────────────────────────────────────── */
-export type NavTab = "home" | "events" | "games" | "profile";
+export type NavTab = "home" | "discover" | "live" | "profile" | "events" | "games";
 const NAV: { key: NavTab; icon: IconName; label: string }[] = [
   { key: "home", icon: "home-variant", label: "Home" },
-  { key: "events", icon: "calendar-star", label: "Events" },
-  { key: "games", icon: "whistle", label: "My Games" },
+  { key: "discover", icon: "compass-outline", label: "Discover" },
+  { key: "live", icon: "broadcast", label: "Live" },
   { key: "profile", icon: "account", label: "Profile" },
 ];
-const NAV_PATH: Record<NavTab, "/home" | "/events" | "/games" | "/profile"> = {
-  home: "/home",
+const NAV_PATH: Record<NavTab, string> = {
+  home: "/(tabs)/home",
+  discover: "/(tabs)/discover",
+  live: "/(tabs)/live",
+  profile: "/(tabs)/profile",
   events: "/events",
   games: "/games",
-  profile: "/profile",
 };
 
 export function BottomNav({ active, onNavigate }: { active: NavTab; onNavigate?: (t: NavTab) => void }) {
   const segments = useSegments() as readonly string[];
   const insets = useSafeAreaInsets();
+  useEffect(() => {
+    if (Platform.OS !== "android" || segments[0] === "(tabs)") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (active !== "home") {
+        router.replace("/(tabs)/home" as never);
+      } else {
+        Alert.alert("Exit FLEG Score?", "Do you want to close the app?", [
+          { text: "Stay", style: "cancel" },
+          { text: "Exit", onPress: () => BackHandler.exitApp() },
+        ]);
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [active, segments]);
   if (segments[0] === "(tabs)") return null;
   function go(t: NavTab) {
     if (onNavigate) return onNavigate(t);
