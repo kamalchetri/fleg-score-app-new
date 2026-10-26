@@ -18,6 +18,14 @@ export const SEED_SPORTS: NspgSport[] = [
   { slug: "boxing", name: "Boxing", icon: "boxing-glove", liveCount: 0, todayCount: 6 },
   { slug: "archery", name: "Archery", icon: "target", liveCount: 0, todayCount: 2 },
   { slug: "athletics", name: "Athletics", icon: "run", liveCount: 0, todayCount: 8 },
+  { slug: "badminton", name: "Badminton", icon: "badminton", liveCount: 0, todayCount: 0 },
+  { slug: "lawn-tennis", name: "Lawn Tennis", icon: "tennis", liveCount: 0, todayCount: 0 },
+  { slug: "pencak-silat", name: "Pencak Silat", icon: "karate", liveCount: 0, todayCount: 0 },
+  { slug: "sepaktakraw", name: "Sepaktakraw", icon: "volleyball", liveCount: 0, todayCount: 0 },
+  { slug: "table-tennis", name: "Table Tennis", icon: "table-tennis", liveCount: 0, todayCount: 0 },
+  { slug: "taekwondo", name: "Taekwondo", icon: "karate", liveCount: 0, todayCount: 0 },
+  { slug: "wrestling", name: "Wrestling", icon: "kabaddi", liveCount: 0, todayCount: 0 },
+  { slug: "wushu", name: "Wushu", icon: "karate", liveCount: 0, todayCount: 0 },
 ];
 
 export const SEED_FIXTURES: Fixture[] = [
