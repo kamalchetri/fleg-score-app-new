@@ -3,8 +3,10 @@ import { router } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors, Radius, Spacing } from "@/lib/theme";
 import { Txt } from "@/components/kit";
+import { useAuth } from "@/lib/auth-context";
 
 export function PublicHeader({ title = "NSPG 2026" }: { title?: string }) {
+  const { session } = useAuth();
   return (
     <View style={styles.header}>
       <View style={styles.topRow}>
@@ -12,9 +14,9 @@ export function PublicHeader({ title = "NSPG 2026" }: { title?: string }) {
           <Image source={require("../../assets/nspg/nspg-icon-white.png")} style={styles.emblem} resizeMode="contain" accessibilityLabel="NSPG emblem" />
           <View style={styles.title}><Txt variant="labelCaps" color={Colors.primary}>NSPG 2026</Txt><Txt variant="bodySm" color={Colors.textDim}>{title}</Txt></View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/login" as never)} style={styles.signIn}>
+        <Pressable accessibilityRole="button" onPress={() => router.push(session ? "/(tabs)/profile" as never : "/login" as never)} style={styles.signIn}>
           <MaterialCommunityIcons name="account-outline" size={16} color={Colors.onPrimary} />
-          <Txt variant="labelPill" color={Colors.onPrimary}>Sign in</Txt>
+          <Txt variant="labelPill" color={Colors.onPrimary}>{session ? "Profile" : "Sign in"}</Txt>
         </Pressable>
       </View>
       <View style={styles.partnerRow}>
