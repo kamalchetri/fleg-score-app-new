@@ -118,7 +118,10 @@ export async function getLiveMatches(): Promise<Fixture[]> {
 
 /** One match with its event feed. */
 export async function getMatch(matchId: string): Promise<MatchDetail | null> {
-  return SEED_MATCH[matchId] ?? null; // → select * from nspg_v_match where id = $1
+  const detail = SEED_MATCH[matchId];
+  if (detail) return detail;
+  const fixture = SEED_FIXTURES.find((item) => item.id === matchId);
+  return fixture ? { ...fixture, events: [], periodLabel: fixture.clock ?? (fixture.status === "final" ? "Full Time" : fixture.status === "live" ? "Live" : "Scheduled") } : null; // → select * from nspg_v_match where id = $1
 }
 
 /** Standings / groups for a sport+category. */
