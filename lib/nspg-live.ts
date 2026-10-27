@@ -1,19 +1,16 @@
 /**
- * NSPG live data layer — the ONLY data source the NSPG public hub (Task B) reads from.
- * UI must call these functions; never query Supabase tables directly from screens.
- *
- * Today each function returns SEED data (see ./nspg-seed) so the UI can be built and
- * run before the production provisioning cutover (24 Oct). Claude swaps each body to a
- * Supabase read-view query at cutover — the exported types and signatures below are the
- * stable contract and will NOT change, so no screen code changes when it goes live.
- *
- * Backing Supabase read views (created by Claude at B2, public/anon SELECT only):
- *   nspg_v_sports, nspg_v_fixtures, nspg_v_live, nspg_v_match, nspg_v_standings, nspg_v_medals
+ * NSPG public data facade. Programme metadata is loaded from a restricted,
+ * read-only Supabase RPC. Draft tournaments and closed registrations must not
+ * be exposed through the normal client or replaced with invented results.
  */
-import { NSPG_SPORT_SLUGS, NSPG_SPORTS } from "./sports/nspg";
+import { fetchNspgProgramme, type NspgEventCategory } from "./nspg-programme";
 import {
-  SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS, SEED_MEDALS, SEED_MEDALISTS,
+  SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS,
+  SEED_MEDALS, SEED_MEDALISTS,
 } from "./nspg-seed";
+
+// Synthetic fixtures and athlete results are allowed only in explicit review builds.
+const REVIEW_BUILD = process.env.EXPO_PUBLIC_REVIEW_BUILD === "1";
 
 export type MatchStatus = "scheduled" | "live" | "final";
 
@@ -23,6 +20,7 @@ export interface NspgSport {
   icon: string;            // lucide/ionicon name the kit maps to
   liveCount: number;       // matches live right now
   todayCount: number;      // matches scheduled today
+  categoryCount?: number;  // live count of configured event categories
 }
 
 export interface Side {
@@ -99,13 +97,11 @@ export interface Medalist {
   medal: "gold" | "silver" | "bronze";
 }
 
-// ─── Public hub API (Task B reads only these) ──────────────────────────────
+// ─── Public hub API ─────────────────────────────────────────────────────────
 
-/** All NSPG sports with live/today counts, for the hub grid. */
+/** The database defines all disciplines, not a six-sport local seed list. */
 export async function listNspgSports(): Promise<NspgSport[]> {
-  // Include every discipline from the canonical registry, even when no demo
-  // fixtures exist yet. A missing fixture must never hide a discipline.
-  const seedBySlug = new Map(SEED_SPORTS.map((sport) => [sport.slug, sport]));
+  const { sports } = await fetchNspgProgramme();
   const icons: Record<string, string> = {
     archery: "target", athletics: "run", badminton: "badminton",
     basketball: "basketball", boxing: "boxing-glove", football: "football",
@@ -113,60 +109,64 @@ export async function listNspgSports(): Promise<NspgSport[]> {
     table_tennis: "table-tennis", taekwondo: "karate", volleyball: "volleyball",
     wrestling: "kabaddi", wushu: "karate",
   };
-  return NSPG_SPORT_SLUGS.map((slug) => ({
-    slug,
-    name: NSPG_SPORTS[slug].displayName,
-    icon: seedBySlug.get(slug)?.icon ?? icons[slug] ?? "trophy-outline",
-    liveCount: seedBySlug.get(slug)?.liveCount ?? 0,
-    todayCount: seedBySlug.get(slug)?.todayCount ?? 0,
-  }));
+  return sports.map((sport) => {
+    const review = REVIEW_BUILD ? SEED_SPORTS.find((row) => row.slug === sport.slug) : null;
+    return {
+      slug: sport.slug,
+      name: sport.name,
+      icon: icons[sport.slug] ?? "trophy-outline",
+      liveCount: review?.liveCount ?? 0,
+      todayCount: review?.todayCount ?? 0,
+      categoryCount: sport.categories.length,
+    };
+  });
 }
 
-/** Official Nagaland districts for programme navigation (not registration counts). */
-export const NSPG_DISTRICTS = [
-  "Kohima", "Dimapur", "Mokokchung", "Tuensang", "Mon", "Zunheboto",
-  "Wokha", "Phek", "Kiphire", "Longleng", "Peren", "Chümoukedima",
-  "Niuland", "Tseminyü", "Shamator", "Noklak", "Meluri",
-] as const;
+/** Official districts are the actual registration-form dropdown options. */
+export async function listNspgDistricts(): Promise<string[]> {
+  return (await fetchNspgProgramme()).districts;
+}
 
-/** Fixtures + schedule for one sport (all statuses), newest/soonest first. */
+/** Every category is read from reg_form_categories via the read-only RPC. */
+export async function listNspgCategories(sportSlug: string): Promise<NspgEventCategory[]> {
+  const programme = await fetchNspgProgramme();
+  const record = [...programme.sports, ...(programme.para ? [programme.para] : [])]
+    .find((group) => group.slug === sportSlug);
+  return record?.categories ?? [];
+}
+
+export async function getNspgParaGroup() {
+  return (await fetchNspgProgramme()).para;
+}
+
+/** Until official results are published, do not show private draft fixtures. */
 export async function getSportFixtures(sportSlug: string): Promise<Fixture[]> {
-  return SEED_FIXTURES.filter((f) => f.sportSlug === sportSlug);
-  // → select * from nspg_v_fixtures where sport_slug = $1 order by start_at
+  return REVIEW_BUILD ? SEED_FIXTURES.filter((f) => f.sportSlug === sportSlug) : [];
 }
 
-/** Everything live right now across all sports, for the Live Match Centre. */
 export async function getLiveMatches(): Promise<Fixture[]> {
-  return SEED_LIVE; // → select * from nspg_v_live
+  return REVIEW_BUILD ? SEED_LIVE : [];
 }
 
-/** One match with its event feed. */
 export async function getMatch(matchId: string): Promise<MatchDetail | null> {
-  return SEED_MATCH[matchId] ?? null; // → select * from nspg_v_match where id = $1
+  return REVIEW_BUILD ? SEED_MATCH[matchId] ?? null : null;
 }
 
-/** Standings / groups for a sport+category. */
 export async function getStandings(sportSlug: string, category?: string): Promise<Standings | null> {
+  if (!REVIEW_BUILD) return null;
   const key = category ? `${sportSlug}:${category}` : sportSlug;
   return SEED_STANDINGS[key] ?? SEED_STANDINGS[sportSlug] ?? null;
-  // → select * from nspg_v_standings where sport_slug = $1 and ($2 is null or category = $2)
 }
 
-/** District medal/points tally for the hub's medal view. */
 export async function getMedalTally(): Promise<MedalRow[]> {
-  return SEED_MEDALS; // → select * from nspg_v_medals order by gold desc, silver desc, bronze desc
+  return REVIEW_BUILD ? SEED_MEDALS : [];
 }
 
-/** Published individual medal results for the public athlete directory. */
 export async function getMedalists(): Promise<Medalist[]> {
-  return SEED_MEDALISTS; // → select * from nspg_v_medalists order by published_at desc
+  return REVIEW_BUILD ? SEED_MEDALISTS : [];
 }
 
-/**
- * Live updates. Today: poll every `ms`. At cutover Claude swaps the body to a
- * Supabase realtime channel subscription on matches; the callback contract stays the same.
- */
 export function subscribeLive(onChange: () => void, ms = 15000): () => void {
-  const t = setInterval(onChange, ms);
-  return () => clearInterval(t);
+  const timer = setInterval(onChange, ms);
+  return () => clearInterval(timer);
 }
