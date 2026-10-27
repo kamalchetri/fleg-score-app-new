@@ -1,0 +1,66 @@
+name: One-time FLEG OTA native bootstrap and preview APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ota-bootstrap-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ota-native-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  install-and-build:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install existing locked dependencies
+        run: npm ci
+      - name: Install native EAS Update support with SDK-compatible version
+        run: |
+          npx expo install expo-updates
+          npx expo install --fix
+      - name: Run TypeScript and tests
+        run: |
+          npm run typecheck
+          npm test
+          npx expo-doctor
+      - name: Commit verified native dependencies and lockfile to main
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Install Expo SDK-compatible OTA native runtime"
+            git push origin HEAD:main
+          fi
+          echo "Dependencies installed and verified. A new Android preview APK is required." >> "$GITHUB_STEP_SUMMARY"
+      - name: Set up Expo
+        if: env.EXPO_TOKEN != ''
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Create installable OTA-enabled Android preview APK
+        if: env.EXPO_TOKEN != ''
+        run: eas build --platform android --profile preview --non-interactive --wait
+      - name: Explain missing Expo authorization
+        if: env.EXPO_TOKEN == ''
+        run: |
+          echo "No EXPO_TOKEN secret found. The native dependency commit can succeed, but the new preview APK cannot be built yet." >> "$GITHUB_STEP_SUMMARY"
+          echo "Create EXPO_TOKEN at GitHub Settings > Secrets and variables > Actions, then rerun this workflow." >> "$GITHUB_STEP_SUMMARY"
