@@ -20,6 +20,7 @@ const suites = [
   "guarded-scoring.test.ts",
   "lawn-tennis.test.ts",
   "nspg-provision.test.ts",
+  "nspg-programme.test.ts",
   "nspg-sports.test.ts",
   "organiser-publish.test.ts",
   "organiser-persistence.test.ts",
