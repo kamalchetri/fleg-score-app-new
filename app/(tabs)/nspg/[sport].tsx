@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { PublicMatchCard } from "@/components/nspg/PublicMatchCard";
 import { Screen, Txt } from "@/components/kit";
@@ -21,6 +21,7 @@ export default function SportScreen() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<"fixtures" | "standings" | "results">("fixtures");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -41,7 +42,7 @@ export default function SportScreen() {
       if (active) setError(e instanceof Error ? e.message : "Could not load sport details.");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [sport]);
+  }, [sport, refreshKey]);
 
   const filteredCategories = useMemo(
     () => categories.filter((category) => category.name.toLowerCase().includes(query.trim().toLowerCase())),
@@ -52,7 +53,8 @@ export default function SportScreen() {
     && (tab === "results" ? fixture.status === "final" : tab === "fixtures" ? fixture.status !== "final" : true),
   );
 
-  return <Screen><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+  return <Screen><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
+    refreshControl={<RefreshControl refreshing={loading} onRefresh={() => setRefreshKey((key) => key + 1)} />}>
     <Txt variant="labelCaps" color={Colors.primary}>NSPG SPORT</Txt>
     <Txt variant="displayHero">{name || (loading ? "Loading…" : sport)}</Txt>
     {error ? <Txt variant="bodyMd" color={Colors.danger}>{error}</Txt> : null}
