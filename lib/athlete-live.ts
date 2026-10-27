@@ -59,6 +59,8 @@ const PROFILES: AthleteProfile[] = [
 ];
 
 export async function getAthleteProfile(regId: string): Promise<AthleteProfile | null> {
+  // These profiles are synthetic review data. Never expose them in normal builds.
+  if (process.env.EXPO_PUBLIC_REVIEW_BUILD !== "1") return null;
   return PROFILES.find((profile) => profile.regId.toLowerCase() === regId.trim().toLowerCase()) ?? null;
 }
 
