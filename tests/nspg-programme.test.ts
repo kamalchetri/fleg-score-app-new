@@ -1,4 +1,4 @@
-import { parseNspgProgramme } from "../lib/nspg-programme";
+import { parseNspgProgramme, readNspgProgrammeFromClient } from "../lib/nspg-programme";
 
 const sample = {
   districts: ["Kohima", "Dimapur"],
@@ -30,3 +30,40 @@ for (const bad of [
   if (!rejected) throw new Error("Malformed programme payload was accepted");
 }
 console.log("NSPG Supabase programme parser tests passed");
+
+/**
+ * Regression for Android crash: SupabaseClient.rpc reads `this.rest`.
+ * A detached rpc reference must never be invoked without the client receiver.
+ */
+async function verifyRpcClientBinding(): Promise<void> {
+  const client = {
+    rest: { ready: true },
+    async rpc(this: { rest: { ready: boolean } }, name: string) {
+      if (!this.rest?.ready) throw new Error("Cannot read property 'rest' of undefined");
+      if (name !== "nspg26_public_programme") throw new Error("Wrong programme RPC");
+      return { data: sample, error: null };
+    },
+  };
+
+  const programme = await readNspgProgrammeFromClient(client);
+  if (programme.districts.length !== 2 || programme.sports[0]?.name !== "Athletics") {
+    throw new Error("NSPG RPC result was not parsed correctly");
+  }
+
+  let rejected = false;
+  try {
+    await readNspgProgrammeFromClient({
+      async rpc() { return { data: null, error: { message: "access denied" } }; },
+    });
+  } catch (error) {
+    rejected = error instanceof Error && error.message.includes("access denied");
+  }
+  if (!rejected) throw new Error("NSPG RPC access errors were not surfaced");
+}
+
+void verifyRpcClientBinding()
+  .then(() => console.log("NSPG RPC client binding regression tests passed"))
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
