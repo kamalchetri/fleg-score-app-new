@@ -72,7 +72,12 @@ export function parseNspgProgramme(data: unknown): NspgProgramme {
 export async function fetchNspgProgramme(): Promise<NspgProgramme> {
   // Lazy import keeps pure programme tests independent of Expo/native storage.
   const { supabase } = await import("./supabase");
-  const { data, error } = await supabase.rpc("nspg26_public_programme" as never);
+  // Database types are generated separately; safely narrow the new RPC's payload.
+  const call = supabase.rpc as unknown as (name: string) => Promise<{
+    data: unknown;
+    error: { message: string } | null;
+  }>;
+  const { data, error } = await call("nspg26_public_programme");
   if (error) throw new Error(`Could not load NSPG programme: ${error.message}`);
   return parseNspgProgramme(data);
 }
