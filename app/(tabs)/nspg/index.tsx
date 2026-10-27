@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { PrimaryButton, Screen, Txt } from "@/components/kit";
@@ -52,7 +52,8 @@ export default function NspgHub() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} />}>
         <PublicHeader />
         <Txt variant="labelCaps" color={Colors.primary}>NAGALAND STATE & PARA GAMES</Txt>
         <Txt variant="displayHero">NSPG 2026</Txt>
