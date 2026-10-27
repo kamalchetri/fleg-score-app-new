@@ -1,79 +1,79 @@
-name: One-time FLEG OTA native bootstrap and preview APK
+name: FLEG standalone Android preview APK (no OTA)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/ota-bootstrap-once.yml
 
 permissions:
-  contents: write
-
-concurrency:
-  group: ota-native-bootstrap
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  install-and-build:
+  build-standalone-preview:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_REVIEW_BUILD: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout main
+        uses: actions/checkout@v4
         with:
           ref: main
-          persist-credentials: true
-      - uses: actions/setup-node@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Install existing locked dependencies
+      - name: Install dependencies
         run: npm ci
-      - name: Install native EAS Update support with SDK-compatible version
-        run: |
-          npx expo install expo-updates
-          npx expo install --fix
-      - name: Run TypeScript and tests
+      - name: TypeScript and tests
         run: |
           npm run typecheck
           npm test
           npx expo-doctor
-      - name: Commit verified native dependencies and lockfile to main
+          node scripts/verify-nspg-catalog.mjs
+      - name: Configure Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Set live Supabase public environment for standalone bundle
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Install Expo SDK-compatible OTA native runtime"
-            # Main may advance while CI installs packages. Rebase generated files
-            # onto the latest main before pushing, never force-push.
-            for attempt in 1 2 3; do
-              git fetch origin main
-              git rebase origin/main
-              if git push origin HEAD:main; then
-                echo "Committed validated OTA dependencies to main." >> "$GITHUB_STEP_SUMMARY"
-                break
-              fi
-              if [[ "$attempt" -eq 3 ]]; then
-                echo "::error::Could not push OTA bootstrap after 3 attempts."
-                exit 1
-              fi
-            done
-          fi
-          echo "Dependencies installed and verified. A new Android preview APK is required." >> "$GITHUB_STEP_SUMMARY"
-      - name: Set up Expo
-        if: env.EXPO_TOKEN != ''
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-      - name: Create installable OTA-enabled Android preview APK
-        if: env.EXPO_TOKEN != ''
-        run: eas build --platform android --profile preview --non-interactive --wait
-      - name: Explain missing Expo authorization
-        if: env.EXPO_TOKEN == ''
+          echo "EXPO_PUBLIC_SUPABASE_URL=$(node -p 'require("./eas.json").build.preview.env.EXPO_PUBLIC_SUPABASE_URL')" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$(node -p 'require("./eas.json").build.preview.env.EXPO_PUBLIC_SUPABASE_ANON_KEY')" >> "$GITHUB_ENV"
+      - name: Prepare separate non-OTA Android preview app
+        shell: bash
         run: |
-          echo "No EXPO_TOKEN secret found. The native dependency commit can succeed, but the new preview APK cannot be built yet." >> "$GITHUB_STEP_SUMMARY"
-          echo "Create EXPO_TOKEN at GitHub Settings > Secrets and variables > Actions, then rerun this workflow." >> "$GITHUB_STEP_SUMMARY"
+          # Use a distinct package to avoid replacing an existing signed app
+          # with a test build signed using Android debug credentials.
+          cat > app.config.js <<'JS'
+          const base = require("./app.json").expo;
+          module.exports = {
+            expo: {
+              ...base,
+              name: "Fleg Score Preview",
+              scheme: "flegscorepreview",
+              android: { ...base.android, package: "in.fleg.score.preview" },
+              updates: { enabled: false, checkAutomatically: "NEVER" },
+            },
+          };
+          JS
+      - name: Generate native Android project (without EAS)
+        run: npx expo prebuild --platform android --clean --non-interactive
+      - name: Build signed test APK using Gradle (no EAS build quota)
+        working-directory: android
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx4g'
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Upload installable test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleg-score-preview-no-ota-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7

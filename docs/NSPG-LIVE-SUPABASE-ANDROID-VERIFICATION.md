@@ -47,60 +47,45 @@ Manual device acceptance:
 5. Test small screens, scrolling, the keyboard, app startup and offline errors.
 6. Record screenshots and Android logs for issues before reporting success.
 
-## Automatic Android updates on each commit to main
+## Android workflow without OTA (27 October 2026)
 
-The FLEG root layout mounts `components/AutoUpdatePrompt.tsx`, which uses
-`expo-updates` in a real Android preview/release build. FLEG checks for an
-available compatible update on launch and when returning to the foreground.
-After it downloads, the app **asks** whether to restart now or later.
-It never forces a restart during active match scoring or unsaved forms.
+OTA is intentionally **disabled** for the FLEG app now. The app bundles its
+JavaScript and assets at APK build time and never checks EAS Update for new code.
+The `AutoUpdatePrompt` is no longer mounted. The `expo-updates` dependency remains
+in the lockfile for now but is disabled in app configuration; keeping the lockfile
+stable avoids unrelated dependency changes. The original production package and
+all Supabase data are unchanged.
 
-GitHub Actions runs `.github/workflows/nspg-preview-ota.yml` on each push
-to `main`: `npm ci`, `npm run typecheck`, `npm test`,
-`npx expo-doctor`, and a live Supabase anonymous programme check. If these
-pass and the changes are JavaScript/assets-only, the workflow publishes to
-EAS Update **preview/Android** only. Native dependency, app.json, eas.json,
-or Android/iOS changes are skipped as incompatible with the current APK.
+### Continuous validation
 
-**One-time native setup — already completed in the repository:**
+Every push to `main` runs `.github/workflows/nspg-preview-ota.yml` (now named
+"FLEG NSPG Android verification (no OTA)") to check `npm ci`, TypeScript,
+tests, Expo Doctor, and the live read-only Supabase public programme RPC.
+The automatic EAS Update publishing job has been removed.
 
-- `expo-updates ~57.0.26` is installed and locked in package-lock.json.
-- `app.json` defines EAS Update URL, check-on-load and runtime 0.2.0.
-- `eas.json` maps the Android APK preview profile to the preview channel.
-- The one-time bootstrap workflow succeeded, including TypeScript,
-  all 25 test suites and all 21 Expo Doctor checks, and committed
-  dependencies as `ee6898cd67cd96aae0e3298a1017615acaf2145c`.
+### Make an APK without Expo cloud build quota
 
-**Remaining account/device actions required:**
+From GitHub Actions, manually run "FLEG standalone Android preview APK (no OTA)"
+on `main` (`.github/workflows/ota-bootstrap-once.yml`). It runs the same
+verification, generates `android/` using Expo prebuild, then attempts Gradle
+`:app:assembleRelease` on a GitHub-hosted Android runner. On success, download the
+`fleg-score-preview-no-ota-apk` artifact from that workflow run.
 
-1. From the Expo account authorized for project
-   `d047d73e-179b-45c1-a024-844c62d1ae8f`, create an Expo access token
-   at https://expo.dev/settings/access-tokens.
-2. Add that token to GitHub repository Settings → Secrets and variables →
-   Actions → New repository secret named `EXPO_TOKEN`. Do not share it in
-   messages or commit it into source control.
-3. On GitHub → Actions, manually run
-   **One-time FLEG OTA native bootstrap and preview APK** on `main`.
-   With EXPO_TOKEN present it invokes:
-   `eas build --platform android --profile preview --non-interactive --wait`.
-   If build credentials/configuration require first-time account interaction,
-   complete those in your authorized Expo account/Codespaces.
-4. Install the *new* OTA-enabled APK on Android once. Earlier APKs that do
-   not contain expo-updates cannot receive OTA changes.
-5. Make a small **JavaScript-only** code change through Copilot,
-   commit/push to `main`, and inspect Actions →
-   **FLEG NSPG Android checks and preview OTA**. The publish-preview
-   job must succeed.
-6. Open or foreground the installed preview app while online. Wait for
-   **FLEG Score update ready**; tap **Update now**, or **Later** to keep
-   the current session and apply the update on a subsequent restart.
+This is a **test APK**, signed with the default Android debug credentials unless
+the native template/runner is separately configured with release signing. The
+standalone preview uses its own Android package `in.fleg.score.preview`, so it
+can be installed beside `in.fleg.score` without uninstalling or overwriting
+the original app. Authentication callbacks/deep links need separate acceptance
+testing in the preview package; do not treat this APK as a production Play Store
+release. This build uses the committed public Supabase anon configuration, not
+private credentials, and never sets `EXPO_PUBLIC_REVIEW_BUILD=1`.
 
-When Supabase registration-form programme metadata changes, no OTA update is
-needed: the NSPG home and sports pages read it directly from Supabase on
-screen load/pull-to-refresh.
-
-**Never report OTA as tested merely because source code is committed.**
-Success requires a real preview APK, successful EAS publish, and an
-Android-device restart showing the committed change.
+**Important:** This bypasses the *EAS cloud build quota*, not Android build
+requirements or GitHub Actions runner limits. No claim of a successful APK,
+device test, or actual GitHub artifact is made until the workflow finishes.
+GitHub commit pushes will not automatically update already-installed Android
+code. A rebuilt/reinstalled APK is required for app code and native changes.
+Supabase programme metadata continues to load live on screen load or refresh,
+and does not require rebuilding an APK.
 
 GitHub Actions: https://github.com/kamalchetri/fleg-score-app-new/actions

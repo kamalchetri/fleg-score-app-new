@@ -11,7 +11,6 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from "@expo-google-fonts/plus-jakarta-sans";
 import { AuthProvider } from "@/lib/auth-context";
-import { AutoUpdatePrompt } from "@/components/AutoUpdatePrompt";
 import { Colors, Font } from "@/lib/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -33,7 +32,6 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <AutoUpdatePrompt />
       <StatusBar style="light" />
       <Stack
         screenOptions={{
