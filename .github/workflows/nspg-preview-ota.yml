@@ -25,6 +25,8 @@ jobs:
         run: npm test
       - name: Expo compatibility
         run: npx expo-doctor
+      - name: Verify current NSPG Supabase public catalogue
+        run: node scripts/verify-nspg-catalog.mjs
 
   publish-preview:
     needs: verify
