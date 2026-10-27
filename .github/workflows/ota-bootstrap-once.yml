@@ -39,6 +39,9 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The legacy `tools` SDK package no longer exists.
+          packages: 'platform-tools'
       - name: Set live Supabase public environment for standalone bundle
         shell: bash
         run: |
@@ -70,6 +73,23 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Verify generated APK is signed and installable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          apks=(android/app/build/outputs/apk/release/*.apk)
+          if (( ${#apks[@]} != 1 )); then
+            echo "::error::Expected exactly one release APK, found ${#apks[@]}"
+            exit 1
+          fi
+          apksigner="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" ]]; then
+            echo "::error::Android apksigner is unavailable"
+            exit 1
+          fi
+          "$apksigner" verify --verbose --print-certs "${apks[0]}"
+          echo "Verified standalone Android APK signature." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload installable test APK
         uses: actions/upload-artifact@v4
         with:
