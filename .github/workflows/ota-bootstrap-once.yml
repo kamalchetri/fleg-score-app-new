@@ -47,7 +47,20 @@ jobs:
           git add package.json package-lock.json
           if ! git diff --cached --quiet; then
             git commit -m "Install Expo SDK-compatible OTA native runtime"
-            git push origin HEAD:main
+            # Main may advance while CI installs packages. Rebase generated files
+            # onto the latest main before pushing, never force-push.
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then
+                echo "Committed validated OTA dependencies to main." >> "$GITHUB_STEP_SUMMARY"
+                break
+              fi
+              if [[ "$attempt" -eq 3 ]]; then
+                echo "::error::Could not push OTA bootstrap after 3 attempts."
+                exit 1
+              fi
+            done
           fi
           echo "Dependencies installed and verified. A new Android preview APK is required." >> "$GITHUB_STEP_SUMMARY"
       - name: Set up Expo
