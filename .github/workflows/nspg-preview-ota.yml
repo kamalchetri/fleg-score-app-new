@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -53,8 +53,10 @@ jobs:
             exit 0
           fi
           # Native dependency/configuration changes require a new Android binary.
-          changed="$(git diff --name-only HEAD^ HEAD || true)"
-          if grep -Eq '^(android/|ios/|app\\.json$|eas\\.json$|package(-lock)?\\.json$|plugins/)' <<< "$changed"; then
+          base="${{ github.event.before }}"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then base="HEAD^"; fi
+          changed="$(git diff --name-only "$base" "$GITHUB_SHA" || true)"
+          if grep -Eq '^(android/|ios/|app[.]json$|eas[.]json$|package(-lock)?[.]json$|plugins/)' <<< "$changed"; then
             echo "::warning::Native configuration or dependency change detected; create a new preview APK before another OTA."
             exit 0
           fi
