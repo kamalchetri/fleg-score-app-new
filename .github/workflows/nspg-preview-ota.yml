@@ -1,0 +1,68 @@
+name: FLEG NSPG Android checks and preview OTA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Expo compatibility
+        run: npx expo-doctor
+
+  publish-preview:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Check OTA prerequisites and native compatibility
+        shell: bash
+        run: |
+          if [[ -z "$EXPO_TOKEN" ]]; then
+            echo "::warning::EXPO_TOKEN is missing. Preview OTA was not published."
+            exit 0
+          fi
+          if ! node -e 'process.exit(require("./package.json").dependencies["expo-updates"] ? 0 : 1)'; then
+            echo "::warning::expo-updates is not installed. Install it with npx expo install expo-updates, commit the lockfile, and build a new preview APK."
+            exit 0
+          fi
+          # Native dependency/configuration changes require a new Android binary.
+          changed="$(git diff --name-only HEAD^ HEAD || true)"
+          if grep -Eq '^(android/|ios/|app\\.json$|eas\\.json$|package(-lock)?\\.json$|plugins/)' <<< "$changed"; then
+            echo "::warning::Native configuration or dependency change detected; create a new preview APK before another OTA."
+            exit 0
+          fi
+          echo "OTA_READY=true" >> "$GITHUB_ENV"
+      - name: Publish JavaScript and assets to preview only
+        if: env.OTA_READY == 'true'
+        shell: bash
+        run: |
+          export EXPO_PUBLIC_SUPABASE_URL="$(node -p 'require("./eas.json").build.preview.env.EXPO_PUBLIC_SUPABASE_URL')"
+          export EXPO_PUBLIC_SUPABASE_ANON_KEY="$(node -p 'require("./eas.json").build.preview.env.EXPO_PUBLIC_SUPABASE_ANON_KEY')"
+          npx --yes eas-cli@latest update --channel preview --non-interactive --message "FLEG preview ${GITHUB_SHA}"
