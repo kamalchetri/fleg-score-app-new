@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fleg Score",
     "slug": "fleg-score",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "scheme": "flegscore",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -53,7 +53,8 @@
     "updates": {
       "url": "https://u.expo.dev/d047d73e-179b-45c1-a024-844c62d1ae8f",
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "enabled": true
     }
   }
 }
