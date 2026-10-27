@@ -9,16 +9,10 @@ import { EmptyState, Screen } from "@/components/ui";
 import { PrimaryButton, Txt } from "@/components/kit";
 import { Colors, Radius, Spacing } from "@/lib/theme";
 
-const FEATURED: Medalist[] = [
-  { regId: "TS-3258", name: "Kedarnath Ao", district: "Mokokchung", sport: "Athletics", event: "100m", medal: "gold" },
-  { regId: "FBL-1234", name: "Arenla Jamir", district: "Kohima", sport: "Football", event: "Women's football", medal: "silver" },
-  { regId: "BOX-2041", name: "Vikuo Ritse", district: "Kohima", sport: "Boxing", event: "Men's 67 kg", medal: "bronze" },
-];
-
 export default function AthletesDirectory() {
   const [query, setQuery] = useState("");
   const [notFound, setNotFound] = useState(false);
-  const [featured, setFeatured] = useState<Medalist[]>(FEATURED);
+  const [featured, setFeatured] = useState<Medalist[]>([]);
   useEffect(() => { void getMedalists().then(setFeatured); }, []);
   const records = useMemo(() => featured.filter((row) => `${row.name} ${row.regId} ${row.district} ${row.sport}`.toLowerCase().includes(query.trim().toLowerCase())), [featured, query]);
   async function openSearch() {
@@ -33,7 +27,7 @@ export default function AthletesDirectory() {
     <Txt variant="displayHero">Athletes</Txt>
     <Txt variant="bodyMd" color={Colors.textDim}>Explore published competition records, medals, rankings, match history, FLEG XP, and sport-specific performance trends.</Txt>
     <View style={styles.searchRow}><TextInput value={query} onChangeText={(value) => { setQuery(value); setNotFound(false); }} placeholder="Search name or Reg ID" placeholderTextColor={Colors.textDim} autoCapitalize="characters" style={styles.input} onSubmitEditing={() => void openSearch()} /><Pressable style={styles.searchButton} onPress={() => void openSearch()}><MaterialCommunityIcons name="magnify" size={22} color={Colors.onPrimary} /></Pressable></View>
-    {notFound ? <EmptyState title="Athlete not found" body="Try the published Reg ID, such as TS-3258 or FBL-1234." /> : null}
+    {notFound ? <EmptyState title="Athlete not found" body="Check the published registration ID and try again." /> : null}
     <View style={styles.feature}><Txt variant="headlineSm">Featured records</Txt><Txt variant="bodySm" color={Colors.textDim}>Tap a card for the full athlete dashboard.</Txt>{records.map((row) => <AthleteCard key={row.regId} row={row} />)}{!records.length && !notFound ? <Txt variant="bodyMd" color={Colors.textDim}>No published athletes match that search.</Txt> : null}</View>
     <PrimaryButton label="Open medal tally" icon="medal-outline" onPress={() => router.push("/(tabs)/nspg/medals" as never)} />
   </ScrollView></Screen>;
