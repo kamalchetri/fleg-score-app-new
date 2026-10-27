@@ -25,6 +25,8 @@ const cases: Array<[string, () => Promise<void>]> = [
 ];
 
 async function main(): Promise<void> {
+  // Synthetic athlete fixtures are permitted only in explicitly tagged review builds.
+  process.env.EXPO_PUBLIC_REVIEW_BUILD = "1";
   let failed = 0;
   for (const [name, run] of cases) {
     try {
