@@ -47,26 +47,37 @@ jobs:
         shell: bash
         run: |
           if [[ -z "$EXPO_TOKEN" ]]; then
-            echo "::warning::EXPO_TOKEN is missing. Preview OTA was not published."
-            exit 0
+            echo "::error::EXPO_TOKEN is missing. Add the GitHub Actions secret to enable preview OTA."
+            exit 1
           fi
           if ! node -e 'process.exit(require("./package.json").dependencies["expo-updates"] ? 0 : 1)'; then
-            echo "::warning::expo-updates is not installed. Install it with npx expo install expo-updates, commit the lockfile, and build a new preview APK."
-            exit 0
+            echo "::error::expo-updates is not installed. Run the one-time OTA bootstrap workflow and install the new APK."
+            exit 1
           fi
           # Native dependency/configuration changes require a new Android binary.
           base="${{ github.event.before }}"
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then base="HEAD^"; fi
-          changed="$(git diff --name-only "$base" "$GITHUB_SHA" || true)"
+          if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "::error::Unable to verify native compatibility because the base commit is unavailable."
+            exit 1
+          fi
+          changed="$(git diff --name-only "$base" "$GITHUB_SHA")"
           if grep -Eq '^(android/|ios/|app[.]json$|eas[.]json$|package(-lock)?[.]json$|plugins/)' <<< "$changed"; then
-            echo "::warning::Native configuration or dependency change detected; create a new preview APK before another OTA."
+            echo "Native change detected: OTA publication skipped; build/install a new preview APK." >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Native code/configuration changed. This push needs a new APK, not OTA."
             exit 0
           fi
           echo "OTA_READY=true" >> "$GITHUB_ENV"
+      - name: Setup EAS CLI authentication
+        if: env.OTA_READY == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
       - name: Publish JavaScript and assets to preview only
         if: env.OTA_READY == 'true'
         shell: bash
         run: |
           export EXPO_PUBLIC_SUPABASE_URL="$(node -p 'require("./eas.json").build.preview.env.EXPO_PUBLIC_SUPABASE_URL')"
           export EXPO_PUBLIC_SUPABASE_ANON_KEY="$(node -p 'require("./eas.json").build.preview.env.EXPO_PUBLIC_SUPABASE_ANON_KEY')"
-          npx --yes eas-cli@latest update --channel preview --non-interactive --message "FLEG preview ${GITHUB_SHA}"
+          eas update --channel preview --platform android --non-interactive --message "FLEG preview ${GITHUB_SHA}"
