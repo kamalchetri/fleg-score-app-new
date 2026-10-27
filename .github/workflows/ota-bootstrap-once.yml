@@ -6,6 +6,13 @@ on:
     branches: [main]
     paths:
       - .github/workflows/ota-bootstrap-once.yml
+      - app/**
+      - components/**
+      - lib/**
+      - assets/**
+      - package.json
+      - package-lock.json
+      - app.json
 
 permissions:
   contents: read
