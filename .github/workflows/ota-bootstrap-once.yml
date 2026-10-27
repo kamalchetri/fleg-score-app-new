@@ -2,6 +2,10 @@ name: FLEG standalone Android preview APK (no OTA)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ota-bootstrap-once.yml
 
 permissions:
   contents: read
