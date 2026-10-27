@@ -68,16 +68,28 @@ export function parseNspgProgramme(data: unknown): NspgProgramme {
   return { districts, sports, para };
 }
 
+type NspgRpcClient = {
+  rpc(name: string): Promise<{
+    data: unknown;
+    error: { message: string } | null;
+  }>;
+};
+
+/**
+ * Invoke the RPC as a client method, retaining its `this` receiver.
+ * SupabaseClient.rpc accesses `this.rest`; calling a detached function
+ * produces "Cannot read property 'rest' of undefined" on Android.
+ */
+export async function readNspgProgrammeFromClient(client: NspgRpcClient): Promise<NspgProgramme> {
+  const { data, error } = await client.rpc("nspg26_public_programme");
+  if (error) throw new Error(`Could not load NSPG programme: ${error.message}`);
+  return parseNspgProgramme(data);
+}
+
 /** Always queries Supabase: no hardcoded district, sport, or category fallback. */
 export async function fetchNspgProgramme(): Promise<NspgProgramme> {
   // Lazy import keeps pure programme tests independent of Expo/native storage.
   const { supabase } = await import("./supabase");
-  // Database types are generated separately; safely narrow the new RPC's payload.
-  const call = supabase.rpc as unknown as (name: string) => Promise<{
-    data: unknown;
-    error: { message: string } | null;
-  }>;
-  const { data, error } = await call("nspg26_public_programme");
-  if (error) throw new Error(`Could not load NSPG programme: ${error.message}`);
-  return parseNspgProgramme(data);
+  // Database types are generated separately; narrow the new RPC's payload.
+  return readNspgProgrammeFromClient(supabase as unknown as NspgRpcClient);
 }
