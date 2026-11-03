@@ -1,9 +1,10 @@
 import { getAthleteAnalytics, getAthleteByRegId } from "../lib/athlete-live";
-import { getMedalists } from "../lib/nspg-live";
+import { SEED_MEDALISTS } from "../lib/nspg-seed";
 
 const cases: Array<[string, () => Promise<void>]> = [
   ["every featured medalist opens a public athlete record", async () => {
-    const medalists = await getMedalists();
+    // Test the synthetic review profiles against synthetic review medallists, not the live public feed.
+    const medalists = SEED_MEDALISTS;
     for (const medalist of medalists) {
       const profile = await getAthleteByRegId(medalist.regId);
       if (!profile) throw new Error(`${medalist.regId} has no profile`);
