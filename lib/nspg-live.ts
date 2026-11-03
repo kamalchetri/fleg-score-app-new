@@ -6,7 +6,6 @@
 import { fetchNspgProgramme, type NspgEventCategory } from "./nspg-programme";
 import {
   SEED_SPORTS, SEED_FIXTURES, SEED_LIVE, SEED_MATCH, SEED_STANDINGS,
-  SEED_MEDALS, SEED_MEDALISTS,
 } from "./nspg-seed";
 
 // Synthetic fixtures and athlete results are allowed only in explicit review builds.
@@ -158,12 +157,41 @@ export async function getStandings(sportSlug: string, category?: string): Promis
   return SEED_STANDINGS[key] ?? SEED_STANDINGS[sportSlug] ?? null;
 }
 
+// Read the same approved medal snapshot as the official NSPG public website.
+// Never substitute review seeds or hardcoded totals for published results.
+const NSPG_MEDALS_ENDPOINT =
+  `${(process.env.EXPO_PUBLIC_FLEG_WEB_URL || "https://www.fleg.in").replace(/\/$/, "")}/api/nspg/medals`;
+
+type MedalSnapshot = { rows: MedalRow[]; medalists: Medalist[] };
+let medalSnapshotRequest: Promise<MedalSnapshot> | null = null;
+
+function loadMedalSnapshot(): Promise<MedalSnapshot> {
+  if (!medalSnapshotRequest) {
+    medalSnapshotRequest = (async () => {
+      const response = await fetch(NSPG_MEDALS_ENDPOINT, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`Could not load live NSPG medals (HTTP ${response.status}).`);
+      }
+      const result = (await response.json()) as Partial<MedalSnapshot>;
+      if (!Array.isArray(result.rows) || !Array.isArray(result.medalists)) {
+        throw new Error("Invalid official NSPG medal response.");
+      }
+      return { rows: result.rows, medalists: result.medalists };
+    })().finally(() => {
+      medalSnapshotRequest = null;
+    });
+  }
+  return medalSnapshotRequest;
+}
+
 export async function getMedalTally(): Promise<MedalRow[]> {
-  return REVIEW_BUILD ? SEED_MEDALS : [];
+  return (await loadMedalSnapshot()).rows;
 }
 
 export async function getMedalists(): Promise<Medalist[]> {
-  return REVIEW_BUILD ? SEED_MEDALISTS : [];
+  return (await loadMedalSnapshot()).medalists;
 }
 
 export function subscribeLive(onChange: () => void, ms = 15000): () => void {
