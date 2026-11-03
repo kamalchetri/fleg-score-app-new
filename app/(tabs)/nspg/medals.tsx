@@ -10,21 +10,52 @@ import { Colors, Radius, Spacing } from "@/lib/theme";
 export default function MedalTally() {
   const [rows, setRows] = useState<MedalRow[]>([]);
   const [medalists, setMedalists] = useState<Medalist[]>([]);
+  const [loadError, setLoadError] = useState(false);
   useEffect(() => {
-    void Promise.all([getMedalTally(), getMedalists()]).then(([tally, winners]) => {
-      setRows(tally);
-      setMedalists(winners);
-    });
+    let mounted = true;
+    const refresh = () => {
+      void Promise.all([getMedalTally(), getMedalists()])
+        .then(([tally, winners]) => {
+          if (!mounted) return;
+          setRows(tally);
+          setMedalists(winners);
+          setLoadError(false);
+        })
+        .catch(() => {
+          if (mounted) setLoadError(true);
+        });
+    };
+    refresh();
+    const timer = setInterval(refresh, 30_000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
   }, []);
+  const totals = rows.reduce(
+    (sum, row) => ({
+      gold: sum.gold + row.gold,
+      silver: sum.silver + row.silver,
+      bronze: sum.bronze + row.bronze,
+      total: sum.total + row.total,
+    }),
+    { gold: 0, silver: 0, bronze: 0, total: 0 },
+  );
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <PublicHeader title="Medals & athlete records" />
         <Txt variant="labelCaps" color={Colors.primary}>NSPG 2026 · OFFICIAL RESULTS</Txt>
         <Txt variant="displayHero">Medal tally</Txt>
+        {rows.length > 0 ? (
+          <Txt variant="bodyMd" color={Colors.textDim}>Gold {totals.gold} · Silver {totals.silver} · Bronze {totals.bronze} · Total {totals.total}</Txt>
+        ) : null}
+        {loadError ? (
+          <Txt variant="bodyMd" color={Colors.textDim}>Live medal updates are temporarily unavailable. The last loaded tally is displayed.</Txt>
+        ) : null}
         <Txt variant="bodyMd" color={Colors.textDim}>District standings and published athlete results. Tap any athlete to open their record, ranking, history, and performance analytics.</Txt>
         <View style={styles.table}>
-          {rows.length === 0 ? <Txt variant="bodyMd" color={Colors.textDim}>No official medal tally has been published yet.</Txt> : null}
+          {rows.length === 0 && !loadError ? <Txt variant="bodyMd" color={Colors.textDim}>No official medal tally has been published yet.</Txt> : null}
           <View style={styles.head}><Txt variant="labelCaps" color={Colors.textDim}>DISTRICT</Txt><Txt variant="labelCaps" color={Colors.textDim}>G · S · B · TOTAL</Txt></View>
           {rows.map((row, i) => <View key={row.district} style={styles.row}><Txt variant="bodyLg">{i + 1}. {row.district}</Txt><View style={styles.medals}><Medal value={row.gold} color={Colors.gold} /><Medal value={row.silver} color={Colors.silver} /><Medal value={row.bronze} color={Colors.bronze} /><Txt variant="labelPill" color={Colors.primary}>{row.total}</Txt></View></View>)}
         </View>
